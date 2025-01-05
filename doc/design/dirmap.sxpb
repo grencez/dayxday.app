@@ -1,0 +1,36 @@
+(dayxday.app  ; Toplevel repository dir.
+ LICENSE  ; License information (already exists)
+ .git  ; Git repository directory.
+ .gitignore  ; Specifies intentionally untracked files that Git should ignore.
+ manifest.json
+ package.json  ; Project metadata and dependencies.
+ package-lock.json  ; Dependency lock file.
+ vite.config.mts  ; Vite configuration file.
+ (doc  ; Documentation
+  (design  ; Design documents
+   initial_design.md  ; Initial design document
+   dirmap.sxpb  ; Directory structure of codebase. This file.
+ ))
+ (src  ; Source code.
+  App.vue  ; Root component
+  index.html
+  main.mts  ; Entry point for the Vue app
+  router.mts  ; Vue Router configuration
+  (asset  ; Static assets (images, fonts, etc.)
+   logo.png
+   (component  ; Reusable Vue components.
+    Activity.vue
+    DayView.vue
+   )
+   (composable  ; Reusable Vue composition functions.
+    useDragAndDrop.mts
+   )
+   (style  ; Global styles.
+    main.css
+   )
+  )
+ )
+ (test  ; Unit and integration tests.
+ )
+ (node_modules)  ; Node.js dependencies (ignored by git).
+)
