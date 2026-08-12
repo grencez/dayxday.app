@@ -5,3 +5,11 @@
 (database
  (description Connect the UI with a local database managed by Pinia.)
 )
+(populate_ui_button
+ (description Add a button that populates the UI with the commented data in `src/view/DayView.vue`.)
+ (steps
+  (1 Add a button to `src/view/DayView.vue`.)
+  (2 Add a click handler to the button.)
+  (3 In the click handler, use the commented data to initialize the activity store.)
+ )
+)

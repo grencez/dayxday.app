@@ -1,7 +1,7 @@
 import { onMounted, onUnmounted, ref, nextTick } from "vue";
-import { useActivityStore } from "../store/activity";
+import { useActivityStore, Activity } from "../store/activity";
 import { calculateSnappedY } from "../function/calculateSnappedY";
-import { isMouseInTimeMarkers } from "../function/isMouseInTimeMarkers";
+import { isMouseInTimeAxisArea } from "../function/isMouseInTimeAxisArea";
 import { updateActivityElementStyle } from "../function/updateActivityElementStyle";
 
 // Main Composable
@@ -12,7 +12,7 @@ export function useDragAndDrop() {
   let draggedItem: HTMLElement | null = null;
   let isResizingActivity = false;
   let isResizingBorder = false;
-  let draggedActivityIndex: number | null = null;
+  let draggedActivityId: number | null = null;
   let draggedBorderIndex: number | null = null;
 
   let initialStartTime = 0;
@@ -75,18 +75,17 @@ export function useDragAndDrop() {
    * Handles the start of activity dragging.
    */
   const startActivityDrag = (item: Element, index: number) => {
-    draggedActivityIndex = index;
+    const activity = activityStore.getActivitiesForDay[index];
+    draggedActivityId = activity.id;
     (item as HTMLElement).style.cursor = "ns-resize";
-    initialStartTime =
-      activityStore.getActivitiesForDay[draggedActivityIndex].start_time_minutes;
-    initialDuration =
-      activityStore.getActivitiesForDay[draggedActivityIndex].duration_minutes;
+    initialStartTime = activity.start_time_minutes;
+    initialDuration = activity.duration_minutes;
     isResizingActivity = true;
     isResizingBorder = false;
 
-    const timeMarkers = document.querySelector(".time-markers");
+    const time_axis_area = document.querySelector(".time-axis-area");
     border_orig_screen_y =
-      timeMarkers?.getBoundingClientRect().top +
+      time_axis_area?.getBoundingClientRect().top +
       initialStartTime +
       initialDuration;
   };
@@ -102,22 +101,22 @@ export function useDragAndDrop() {
       ((e as TouchEvent).touches && (e as TouchEvent).touches[0].clientY);
     if (mouse_curr_screen_y === undefined) return;
 
-    const timeMarkers = document.querySelector(".time-markers");
-    const timeMarkersRect = timeMarkers?.getBoundingClientRect();
+    const time_axis_area = document.querySelector(".time-axis-area");
+    const time_axis_area_rect = time_axis_area?.getBoundingClientRect();
 
     let border_curr_screen_y = border_orig_screen_y;
-    if (timeMarkersRect && isMouseInTimeMarkers(e, timeMarkersRect)) {
+    if (time_axis_area_rect && isMouseInTimeAxisArea(e, time_axis_area_rect)) {
       border_curr_screen_y = calculateSnappedY(
         mouse_curr_screen_y,
-        timeMarkersRect,
+        time_axis_area_rect,
       );
     } else {
       border_curr_screen_y += mouse_curr_screen_y - mouse_orig_screen_y;
     }
 
-    if (isResizingActivity && draggedActivityIndex !== null) {
+    if (isResizingActivity && draggedActivityId !== null) {
       const diffY = border_curr_screen_y - border_orig_screen_y;
-      handleActivityResize(diffY, draggedActivityIndex);
+      handleActivityResize(diffY);
     } else if (isResizingBorder && draggedBorderIndex !== null) {
       handleBorderDrag(border_curr_screen_y, draggedBorderIndex);
     }
@@ -132,7 +131,7 @@ export function useDragAndDrop() {
     isDragging.value = false;
 
     if (draggedItem) {
-      if (isResizingActivity && draggedActivityIndex !== null) {
+      if (isResizingActivity && draggedActivityId !== null) {
         endActivityDrag();
       } else if (isResizingBorder && draggedBorderIndex !== null) {
         endBorderDrag();
@@ -142,7 +141,7 @@ export function useDragAndDrop() {
       draggedItem = null;
       isResizingActivity = false;
       isResizingBorder = false;
-      draggedActivityIndex = null;
+      draggedActivityId = null;
       draggedBorderIndex = null;
     }
   };
@@ -151,10 +150,14 @@ export function useDragAndDrop() {
    * Handles the end of activity dragging.
    */
   const endActivityDrag = () => {
-    const activity = activityStore.getActivitiesForDay[draggedActivityIndex!];
-    activityStore.updateActivity(activity.id, {
-      duration_minutes: activity.duration_minutes,
-    });
+    const activity = activityStore.getActivitiesForDay.find(
+      (a) => a.id === draggedActivityId,
+    );
+    if (activity) {
+      activityStore.updateActivity(activity.id, {
+        duration_minutes: activity.duration_minutes,
+      });
+    }
   };
 
   /**
@@ -178,26 +181,33 @@ export function useDragAndDrop() {
   /**
    * Handles the resizing of an activity.
    */
-  function handleActivityResize(diffY: number, draggedActivityIndex: number) {
-    const currentActivity =
-      activityStore.getActivitiesForDay[draggedActivityIndex];
+  function handleActivityResize(diffY: number) {
+    const activity = activityStore.getActivitiesForDay.find(
+      (a) => a.id === draggedActivityId,
+    );
+    if (!activity) return;
+
     const newDuration = initialDuration + diffY;
 
     if (newDuration > 0) {
-      activityStore.updateActivity(currentActivity.id, {
+      activityStore.updateActivity(activity.id, {
         duration_minutes: newDuration,
       });
-      updateActivityElementStyle(draggedActivityIndex, {
+      const activityIndex = activityStore.getActivitiesForDay.findIndex(
+        (a) => a.id === activity.id,
+      );
+      updateActivityElementStyle(activityIndex, {
         height: newDuration,
       });
 
       for (
-        let i = draggedActivityIndex + 1;
+        let i = activityIndex + 1;
         i < activityStore.getActivitiesForDay.length;
         i++
       ) {
         const prevActivity = activityStore.getActivitiesForDay[i - 1];
-        const newStartTime = prevActivity.start_time_minutes + prevActivity.duration_minutes;
+        const newStartTime =
+          prevActivity.start_time_minutes + prevActivity.duration_minutes;
         activityStore.updateActivity(activityStore.getActivitiesForDay[i].id, {
           start_time_minutes: newStartTime,
         });
@@ -229,9 +239,12 @@ export function useDragAndDrop() {
 
     if (newDurationA > 0 && newDurationB > 0) {
       // Update durations and start time
-      activityStore.updateActivity(activityA.id, { duration_minutes: newDurationA });
+      activityStore.updateActivity(activityA.id, {
+        duration_minutes: newDurationA,
+      });
       activityStore.updateActivity(activityB.id, {
-        start_time_minutes: activityA.start_time_minutes + activityA.duration_minutes,
+        start_time_minutes:
+          activityA.start_time_minutes + activityA.duration_minutes,
         duration_minutes: newDurationB,
       });
 
@@ -252,36 +265,13 @@ export function useDragAndDrop() {
 
   onMounted(() => {
     nextTick(() => {
-      const activityItems = document.querySelectorAll(".activity-item");
-      const activityBorders = document.querySelectorAll(".activity-border");
-
-      activityItems.forEach((item, index) => {
-        item.addEventListener("mousedown", (e) =>
-          startDrag(e, item, index, false),
-        );
-        item.addEventListener(
-          "touchstart",
-          (e) => {
-            startDrag(e, item, index, false);
-          },
-          { passive: true },
-        );
-      });
-
-      activityBorders.forEach((border, index) => {
-        border.addEventListener("mousedown", (e) => {
-          e.stopPropagation();
-          startDrag(e, border, index, true);
+      const activityList = document.querySelector(".activity-list");
+      if (activityList) {
+        activityList.addEventListener("mousedown", handleMouseDown);
+        activityList.addEventListener("touchstart", handleTouchStart, {
+          passive: true,
         });
-        border.addEventListener(
-          "touchstart",
-          (e) => {
-            e.stopPropagation();
-            startDrag(e, border, index, true);
-          },
-          { passive: true },
-        );
-      });
+      }
 
       window.addEventListener("mousemove", moveDrag);
       window.addEventListener("touchmove", moveDrag, { passive: true });
@@ -298,11 +288,52 @@ export function useDragAndDrop() {
   });
 
   onUnmounted(() => {
+    const activityList = document.querySelector(".activity-list");
+    if (activityList) {
+      activityList.removeEventListener("mousedown", handleMouseDown);
+      activityList.removeEventListener("touchstart", handleTouchStart);
+    }
     window.removeEventListener("mousemove", moveDrag);
     window.removeEventListener("touchmove", moveDrag);
     window.removeEventListener("mouseup", endDrag);
     window.removeEventListener("touchend", endDrag);
   });
+
+  function handleMouseDown(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains("activity-item")) {
+      const activityId = Number(target.dataset.activityId);
+      const index = activityStore.getActivitiesForDay.findIndex(
+        (a) => a.id === activityId,
+      );
+      if (index !== -1) {
+        startDrag(e, target, index, false);
+      }
+    } else if (target.classList.contains("activity-border")) {
+      const index = Number(target.dataset.borderIndex);
+      if (!isNaN(index)) {
+        startDrag(e, target, index, true);
+      }
+    }
+  }
+
+  function handleTouchStart(e: TouchEvent) {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains("activity-item")) {
+      const activityId = Number(target.dataset.activityId);
+      const index = activityStore.getActivitiesForDay.findIndex(
+        (a) => a.id === activityId,
+      );
+      if (index !== -1) {
+        startDrag(e, target, index, false);
+      }
+    } else if (target.classList.contains("activity-border")) {
+      const index = Array.from(
+        document.querySelectorAll(".activity-border"),
+      ).indexOf(target);
+      startDrag(e, target, index, true);
+    }
+  }
 
   return { startDrag, moveDrag, endDrag };
 }

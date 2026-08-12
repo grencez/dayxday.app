@@ -31,9 +31,24 @@ describe("useDragAndDrop", () => {
 
     const activityStore = useActivityStore();
     activities.value = [
-      { id: 1, name: "Activity A", start_time_minutes: 100, duration_minutes: 100 },
-      { id: 2, name: "Activity B", start_time_minutes: 200, duration_minutes: 100 },
-      { id: 3, name: "Activity C", start_time_minutes: 300, duration_minutes: 100 },
+      {
+        id: 1,
+        name: "Activity A",
+        start_time_minutes: 100,
+        duration_minutes: 100,
+      },
+      {
+        id: 2,
+        name: "Activity B",
+        start_time_minutes: 200,
+        duration_minutes: 100,
+      },
+      {
+        id: 3,
+        name: "Activity C",
+        start_time_minutes: 300,
+        duration_minutes: 100,
+      },
     ];
     activityStore.initializeActivities(activities.value);
 
@@ -100,7 +115,7 @@ describe("useDragAndDrop", () => {
       return [];
     });
     vi.spyOn(document, "querySelector").mockImplementation((selector) => {
-      if (selector === ".time-markers") {
+      if (selector === ".time-axis-area") {
         return mockTimeMarkers;
       }
       return null;
@@ -128,7 +143,8 @@ describe("useDragAndDrop", () => {
     if (wrapper.vm.activities) {
       const initialStartTimeA = wrapper.vm.activities[0].start_time_minutes;
       const initialEndTimeB =
-        wrapper.vm.activities[1].start_time_minutes + wrapper.vm.activities[1].duration_minutes;
+        wrapper.vm.activities[1].start_time_minutes +
+        wrapper.vm.activities[1].duration_minutes;
 
       // Simulate mousedown on the border between A and B
       const mousedownEvent = new MouseEvent("mousedown", { clientY: 150 });
@@ -140,9 +156,12 @@ describe("useDragAndDrop", () => {
       endDrag();
 
       // Assert that start time of A and end time of B have not changed
-      expect(wrapper.vm.activities[0].start_time_minutes).toBe(initialStartTimeA);
+      expect(wrapper.vm.activities[0].start_time_minutes).toBe(
+        initialStartTimeA,
+      );
       expect(
-        wrapper.vm.activities[1].start_time_minutes + wrapper.vm.activities[1].duration_minutes,
+        wrapper.vm.activities[1].start_time_minutes +
+          wrapper.vm.activities[1].duration_minutes,
       ).toBe(initialEndTimeB);
     }
   });

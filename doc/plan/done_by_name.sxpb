@@ -30,3 +30,14 @@
 (fix_find_activities_from_time
  (description Fix the failing test in `test/store/activity.spec.ts` related to `findActivitiesFromTime`. The issue is that the test is expecting to find two activities, but the logic in `findActivitiesFromTime` only returns activities that *start* at or after the given time, not activities that *overlap* with the given time. I will update the test to reflect the current logic.)
 )
+(rename_time_markers
+ (description Rename "time-markers" to "time-axis-area".)
+ (steps
+  (1 Rename the `time-markers` class in `src/view/DayView.vue` to `time-axis-area`.)
+  (2 Rename the `time-marker` class in `src/view/DayView.vue` to `time-axis-mark`.)
+  (3 Update the corresponding CSS rules in `src/view/DayView.vue` to reflect the new class names.)
+  (4 Update the test in `test/view/DayView.spec.mts` to reflect the new class names.)
+  (5 Rename `src/function/isMouseInTimeMarkers.ts` to `src/function/isMouseInTimeAxisArea.ts` and update the function name to `isMouseInTimeAxisArea`. Update the import in `src/composable/useDragAndDrop.mts`.)
+  (6 Update the test in `test/composable/useDragAndDrop.spec.mts` to use the new class name `.time-axis-area`.)
+ )
+)

@@ -8,5 +8,18 @@
   (4 Ensure that the new activity's duration is calculated correctly based on the existing activities.)
   (5 Update the UI to reflect the new activity.)
   (6 Write a test for the new behavior.)
+  (7 Ensure that the activities are sorted after insertion.)
+ )
+)
+(click_anywhere_create
+ (description Allow users to create activities by clicking anywhere in the time marker area, not just on time markers.)
+ (steps
+  (1 Modify the click handler in `DayView.vue` to listen for clicks on the time marker container instead of the time markers.)
+  (2 In the click handler, calculate the vertical position of the click within the time marker container.)
+  (3 Convert the vertical position to a time in minutes, considering the height of the activity list represents 24 hours (1440 minutes).)
+  (4 Use the `insertActivityAtTime` action in the `activityStore` to create a new activity at the calculated time.)
+  (5 Ensure that the new activity's duration is calculated correctly based on the existing activities.)
+  (6 Update the UI to reflect the new activity.)
+  (7 Write a test for the new behavior.)
  )
 )

@@ -1,38 +1,54 @@
 <template>
   <div class="day-view">
     <h1>Day View</h1>
-    <div class="time-markers">
+    <div class="button-bar">
+      <button @click="resetActivities" class="reset-button">Reset</button>
+      <button @click="clearActivities" class="clear-button">Clear</button>
+    </div>
+    <div class="time-axis-area" @click="handleTimeAxisAreaClick" ref="timeAxisAreaRef">
       <div
         v-for="hour in hours"
         :key="hour"
-        class="time-marker"
+        class="time-axis-mark"
         :style="{ top: hour * 60 + 'px' }"
-        @click="handleTimeMarkerClick(hour)"
       >
-        <span class="time-text">{{ useTimeFormatter(hour).formattedTime }}</span>
+        <span class="time-text">{{
+          useTimeFormatter(hour).formattedTime
+        }}</span>
         <span class="tick-mark"></span>
       </div>
     </div>
     <div class="activity-list">
-      <div
+      <template
         v-for="(activity, index) in activityStore.getActivitiesForDay"
         :key="activity.id"
-        class="activity-item"
-        :style="{
-          top: activity.start_time_minutes + 'px',
-          height: activity.duration_minutes + 'px',
-        }"
-        :contenteditable="false"
-        @dblclick="makeEditable"
-        @blur="makeUneditable"
       >
-        {{ activity.name }}
         <div
-          v-if="index > 0"
+          class="activity-item"
+          :data-activity-id="activity.id"
+          :style="{
+            top: activity.start_time_minutes + 'px',
+            height: activity.duration_minutes + 'px',
+          }"
+          :contenteditable="false"
+          @dblclick="makeEditable"
+          @blur="makeUneditable"
+        >
+          {{ activity.name }}
+        </div>
+        <div
+          v-if="index < activityStore.getActivitiesForDay.length - 1"
           class="activity-border"
-          :style="{ top: '-5px' }"
+          :data-border-index="index"
+          :style="{
+            top:
+              activity.start_time_minutes +
+              activity.duration_minutes -
+              5 +
+              'px',
+          }"
         ></div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -40,7 +56,7 @@
 <script lang="ts">
 import { useDragAndDrop } from "../composable/useDragAndDrop";
 import { useActivityStore, Activity } from "../store/activity";
-import { onMounted } from "vue";
+import { ref } from "vue";
 import ActivityItem from "../component/ActivityItem.vue";
 import { useTimeFormatter } from "../composable/useTimeFormatter";
 
@@ -53,21 +69,77 @@ export default {
     const activityStore = useActivityStore();
     useDragAndDrop();
 
-    onMounted(() => {
+    const timeAxisAreaRef = ref<HTMLElement | null>(null);
+
+    const resetActivities = () => {
       const initialActivities: Activity[] = [
-        { id: 1, name: "Morning Routine", start_time_minutes: 0, duration_minutes: 100 },
-        { id: 2, name: "Work Session", start_time_minutes: 100, duration_minutes: 200 },
-        { id: 3, name: "Lunch Break", start_time_minutes: 300, duration_minutes: 80 },
-        { id: 4, name: "Afternoon Tasks", start_time_minutes: 380, duration_minutes: 150 },
-        { id: 5, name: "Evening Tasks", start_time_minutes: 530, duration_minutes: 100 },
-        { id: 6, name: "Dinner", start_time_minutes: 630, duration_minutes: 60 },
-        { id: 7, name: "Relax", start_time_minutes: 690, duration_minutes: 120 },
-        { id: 8, name: "Bedtime Routine", start_time_minutes: 810, duration_minutes: 60 },
-        { id: 9, name: "Sleep", start_time_minutes: 870, duration_minutes: 570 },
-        { id: 10, name: "Wake Up", start_time_minutes: 1440, duration_minutes: 0 },
+        {
+          id: 1,
+          name: "Morning Routine",
+          start_time_minutes: 0,
+          duration_minutes: 100,
+        },
+        {
+          id: 2,
+          name: "Work Session",
+          start_time_minutes: 100,
+          duration_minutes: 200,
+        },
+        {
+          id: 3,
+          name: "Lunch Break",
+          start_time_minutes: 300,
+          duration_minutes: 80,
+        },
+        {
+          id: 4,
+          name: "Afternoon Tasks",
+          start_time_minutes: 380,
+          duration_minutes: 150,
+        },
+        {
+          id: 5,
+          name: "Evening Tasks",
+          start_time_minutes: 530,
+          duration_minutes: 100,
+        },
+        {
+          id: 6,
+          name: "Dinner",
+          start_time_minutes: 630,
+          duration_minutes: 60,
+        },
+        {
+          id: 7,
+          name: "Relax",
+          start_time_minutes: 690,
+          duration_minutes: 120,
+        },
+        {
+          id: 8,
+          name: "Bedtime Routine",
+          start_time_minutes: 810,
+          duration_minutes: 60,
+        },
+        {
+          id: 9,
+          name: "Sleep",
+          start_time_minutes: 870,
+          duration_minutes: 570,
+        },
+        {
+          id: 10,
+          name: "Wake Up",
+          start_time_minutes: 1440,
+          duration_minutes: 0,
+        },
       ];
       activityStore.initializeActivities(initialActivities);
-    });
+    };
+
+    const clearActivities = () => {
+      activityStore.initializeActivities([]);
+    };
 
     // Include 24 to show the final 00:00
     const hours = Array.from({ length: 25 }, (_, i) => i);
@@ -81,8 +153,13 @@ export default {
       event.target.contentEditable = false;
     };
 
-    const handleTimeMarkerClick = (hour: number) => {
-      const timeInMinutes = hour * 60;
+    const handleTimeAxisAreaClick = (event: MouseEvent) => {
+      if (!timeAxisAreaRef.value) {
+        return;
+      }
+      const rect = timeAxisAreaRef.value.getBoundingClientRect();
+      const y = event.clientY - rect.top;
+      const timeInMinutes = Math.round((y / rect.height) * 1440);
       activityStore.insertActivityAtTime(timeInMinutes, {
         name: "New Activity",
       });
@@ -94,7 +171,10 @@ export default {
       useTimeFormatter,
       makeEditable,
       makeUneditable,
-      handleTimeMarkerClick,
+      handleTimeAxisAreaClick,
+      timeAxisAreaRef,
+      resetActivities,
+      clearActivities,
     };
   },
 };
@@ -114,18 +194,31 @@ export default {
   grid-column: 1 / 3; /* Span the title across both columns */
 }
 
-.time-markers {
-  position: relative; /* Make this relative */
-  margin-right: 10px;
+.button-bar {
+  grid-column: 1 / 3;
+  margin-bottom: 10px;
+  display: flex;
+  gap: 10px;
 }
 
-.time-marker {
+.reset-button {
+}
+
+.clear-button {
+}
+
+.time-axis-area {
+  position: relative; /* Make this relative */
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.time-axis-mark {
   position: absolute; /* Position absolutely within time-markers */
   left: 0;
   display: flex;
   align-items: center;
   height: 1px;
-  cursor: pointer; /* Add cursor pointer to indicate clickability */
 }
 
 .time-text {

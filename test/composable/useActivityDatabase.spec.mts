@@ -12,15 +12,60 @@ describe("useActivityDatabase", () => {
     setActivePinia(createPinia());
     const activityStore = useActivityStore();
     const activities: Activity[] = [
-      { id: 1, name: "Activity 1", start_time_minutes: 0, duration_minutes: 60 },
-      { id: 2, name: "Activity 2", start_time_minutes: 60, duration_minutes: 60 },
-      { id: 3, name: "Activity 3", start_time_minutes: 120, duration_minutes: 60 },
-      { id: 4, name: "Activity 4", start_time_minutes: 180, duration_minutes: 60 },
-      { id: 5, name: "Activity 5", start_time_minutes: 240, duration_minutes: 60 },
-      { id: 6, name: "Activity 6", start_time_minutes: 300, duration_minutes: 60 },
-      { id: 7, name: "Activity 7", start_time_minutes: 360, duration_minutes: 60 },
-      { id: 8, name: "Activity 8", start_time_minutes: 420, duration_minutes: 60 },
-      { id: 9, name: "Activity 9", start_time_minutes: 480, duration_minutes: 60 },
+      {
+        id: 1,
+        name: "Activity 1",
+        start_time_minutes: 0,
+        duration_minutes: 60,
+      },
+      {
+        id: 2,
+        name: "Activity 2",
+        start_time_minutes: 60,
+        duration_minutes: 60,
+      },
+      {
+        id: 3,
+        name: "Activity 3",
+        start_time_minutes: 120,
+        duration_minutes: 60,
+      },
+      {
+        id: 4,
+        name: "Activity 4",
+        start_time_minutes: 180,
+        duration_minutes: 60,
+      },
+      {
+        id: 5,
+        name: "Activity 5",
+        start_time_minutes: 240,
+        duration_minutes: 60,
+      },
+      {
+        id: 6,
+        name: "Activity 6",
+        start_time_minutes: 300,
+        duration_minutes: 60,
+      },
+      {
+        id: 7,
+        name: "Activity 7",
+        start_time_minutes: 360,
+        duration_minutes: 60,
+      },
+      {
+        id: 8,
+        name: "Activity 8",
+        start_time_minutes: 420,
+        duration_minutes: 60,
+      },
+      {
+        id: 9,
+        name: "Activity 9",
+        start_time_minutes: 480,
+        duration_minutes: 60,
+      },
       {
         id: 10,
         name: "Activity 10",

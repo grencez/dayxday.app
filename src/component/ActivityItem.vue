@@ -1,5 +1,5 @@
 <template>
-  <div class="activity">
+  <div class="activity" :data-activity-id="activity.id">
     {{ activity.name }}
   </div>
 </template>

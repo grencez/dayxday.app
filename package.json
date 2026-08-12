@@ -13,6 +13,7 @@
   "dependencies": {
     "idb": "^8.0.1",
     "pinia": "^2.3.0",
+    "pinia-plugin-persistedstate": "^2.4.0",
     "vue": "^3.3.4",
     "vue-router": "^4.2.4"
   },
@@ -24,6 +25,7 @@
     "eslint-plugin-vue": "^9.32.0",
     "fake-indexeddb": "^6.0.0",
     "jsdom": "^25.0.1",
+    "jsdom-global": "^3.0.2",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.1",

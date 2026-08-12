@@ -17,6 +17,7 @@ export const useActivityStore = defineStore("activity", {
     activities: [],
     nextId: 1,
   }),
+  persist: true,
   getters: {
     getActivitiesForDay(state): Activity[] {
       return state.activities
@@ -38,12 +39,13 @@ export const useActivityStore = defineStore("activity", {
           ) || null
         );
       },
-    findActivitiesFromTime:
+    findActivitiesAfterTime:
       (state) =>
       (time: number): Activity[] => {
         return state.activities
-          .filter((activity) =>
-            activity.start_time_minutes + activity.duration_minutes > time
+          .filter(
+            (activity) =>
+              activity.start_time_minutes > time,
           )
           .sort((a, b) => a.start_time_minutes - b.start_time_minutes);
       },
@@ -70,20 +72,22 @@ export const useActivityStore = defineStore("activity", {
       newActivity: Omit<Activity, "id" | "duration_minutes">,
     ) {
       const existingActivity = this.findActivityAtTime(time);
-      const nextActivities = this.findActivitiesFromTime(time);
+      const nextActivities = this.findActivitiesAfterTime(time);
+
+      if (existingActivity) {
+        if (existingActivity.start_time_minutes === time) {
+          this.removeActivity(existingActivity.id);
+        }
+        else {
+          existingActivity.duration_minutes = time - existingActivity.start_time_minutes;
+        }
+      }
 
       let newDuration: number;
       if (nextActivities.length > 0) {
         newDuration = nextActivities[0].start_time_minutes - time;
       } else {
         newDuration = 1440 - time; // Assuming 1440 as the end of the day
-      }
-
-      if (existingActivity) {
-        const newExistingDuration = time - existingActivity.start_time_minutes;
-        if (newExistingDuration > 0) {
-          existingActivity.duration_minutes = newExistingDuration;
-        }
       }
 
       const fullNewActivity: Activity = {
@@ -93,7 +97,9 @@ export const useActivityStore = defineStore("activity", {
         duration_minutes: newDuration,
       };
       this.activities.push(fullNewActivity);
-      this.activities.sort((a, b) => a.start_time_minutes - b.start_time_minutes);
+      this.activities.sort(
+        (a, b) => a.start_time_minutes - b.start_time_minutes,
+      );
     },
   },
 });
