@@ -1,8 +1,8 @@
 import { useActivityDatabase } from "@/asset/composable/useActivityDatabase";
 import { describe, it, expect, beforeEach } from "vitest";
-import { IDBFactory } from 'fake-indexeddb';
-import { nextTick } from 'vue';
-import { Activity } from '../../src/asset/model/Activity';
+import { IDBFactory } from "fake-indexeddb";
+import { nextTick } from "vue";
+import { Activity } from "../../src/asset/model/Activity";
 import { createPinia, setActivePinia } from "pinia";
 import { useActivityStore } from "../../src/asset/store/activityStore";
 

@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { Activity } from "../model/Activity";
-import { useActivityDatabase } from "../composable/useActivityDatabase";
 
 export const useActivityStore = defineStore("activities", {
   state: () => ({
@@ -17,19 +16,17 @@ export const useActivityStore = defineStore("activities", {
   },
   actions: {
     async initializeActivities(initialActivities?: Activity[]) {
-      const { getActivities } = useActivityDatabase();
       if (initialActivities) {
         this.activities = initialActivities;
       } else {
-        this.activities = getActivities();
+        // Potentially initialize with an empty array or default values
+        this.activities = [];
       }
     },
     async updateActivity(id: number, updates: Partial<Activity>) {
-      const { updateActivity } = useActivityDatabase();
       const index = this.activities.findIndex((activity) => activity.id === id);
       if (index !== -1) {
         Object.assign(this.activities[index], updates);
-        updateActivity(id, updates);
       }
     },
   },

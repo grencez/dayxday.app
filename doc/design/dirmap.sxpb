@@ -8,9 +8,15 @@
  vite.config.mts  ; Vite configuration file.
  (doc  ; Documentation
   (design  ; Design documents
-   initial_design.md  ; Initial design document
+   active.md
+   architecture.md
    dirmap.sxpb  ; Directory structure of codebase. This file.
- ))
+   initial_design.md  ; Initial design document
+   (decision
+    pinia.md
+   )
+  )
+ )
  (src  ; Source code.
   App.vue  ; Root component
   index.html
@@ -25,12 +31,27 @@
    (composable  ; Reusable Vue composition functions.
     useDragAndDrop.mts
    )
+   (function
+    calculateSnappedY.ts
+    isMouseInTimeMarkers.ts
+    updateActivityElementStyle.ts
+   )
+   (store
+    activityStore.ts
+   )
    (style  ; Global styles.
     main.css
    )
   )
  )
  (test  ; Unit and integration tests.
+  (component
+   Activity.spec.mts
+   DayView.spec.mts
+  )
+  (composable
+   useDragAndDrop.spec.mts
+  )
  )
  (node_modules)  ; Node.js dependencies (ignored by git).
 )

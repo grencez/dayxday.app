@@ -1,346 +1,306 @@
-import { onMounted } from "vue";
+import { onMounted, onUnmounted, ref, nextTick } from "vue";
 import { useActivityStore } from "../store/activityStore";
+import { calculateSnappedY } from "../function/calculateSnappedY";
+import { isMouseInTimeMarkers } from "../function/isMouseInTimeMarkers";
+import { updateActivityElementStyle } from "../function/updateActivityElementStyle";
 
+// Main Composable
 export function useDragAndDrop() {
   const activityStore = useActivityStore();
+  const isDragging = ref(false);
+
+  let draggedItem: HTMLElement | null = null;
+  let isResizingActivity = false;
+  let isResizingBorder = false;
+  let draggedActivityIndex: number | null = null;
+  let draggedBorderIndex: number | null = null;
+
+  let initialStartTime = 0;
+  let initialDuration = 0;
+
+  let activity_orig_screen_y = 0;
+  let mouse_orig_screen_y = 0;
+  let border_orig_screen_y = 0;
+  let border_prev_screen_y = 0;
+
+  // --- Event Handlers ---
+
+  /**
+   * Initiates the dragging process.
+   */
+  const startDrag = (
+    e: MouseEvent | TouchEvent,
+    item: Element,
+    index: number,
+    isBorder: boolean,
+  ) => {
+    isDragging.value = true;
+    e.preventDefault();
+    draggedItem = item as HTMLElement;
+    mouse_orig_screen_y =
+      (e as MouseEvent).clientY ||
+      ((e as TouchEvent).touches && (e as TouchEvent).touches[0].clientY) ||
+      0;
+
+    if (isBorder) {
+      startBorderDrag(index);
+    } else {
+      startActivityDrag(item, index);
+    }
+    border_prev_screen_y = border_orig_screen_y;
+    activity_orig_screen_y = border_orig_screen_y - initialDuration;
+  };
+
+  /**
+   * Handles the start of border dragging.
+   */
+  const startBorderDrag = (index: number) => {
+    draggedBorderIndex = index;
+    isResizingBorder = true;
+    isResizingActivity = false;
+
+    // Store the original top position of the border using getBoundingClientRect
+    const borderElement = document.querySelectorAll(".activity-border")[
+      index
+    ] as HTMLElement;
+    initialDuration =
+      activityStore.getActivitiesForDay[draggedBorderIndex].duration;
+    initialStartTime = initialDuration +
+      activityStore.getActivitiesForDay[draggedBorderIndex].startTime;
+
+    border_orig_screen_y = borderElement.getBoundingClientRect().top;
+  };
+
+  /**
+   * Handles the start of activity dragging.
+   */
+  const startActivityDrag = (item: Element, index: number) => {
+    draggedActivityIndex = index;
+    (item as HTMLElement).style.cursor = "ns-resize";
+    initialStartTime =
+      activityStore.getActivitiesForDay[draggedActivityIndex].startTime;
+    initialDuration =
+      activityStore.getActivitiesForDay[draggedActivityIndex].duration;
+    isResizingActivity = true;
+    isResizingBorder = false;
+
+    const timeMarkers = document.querySelector(".time-markers");
+    border_orig_screen_y = timeMarkers?.getBoundingClientRect().top + initialStartTime + initialDuration;
+  };
+
+  /**
+   * Handles the drag movement.
+   */
+  const moveDrag = (e: MouseEvent | TouchEvent) => {
+    if (!draggedItem || !isDragging.value) return;
+
+    let mouse_curr_screen_y =
+      (e as MouseEvent).clientY ||
+      ((e as TouchEvent).touches && (e as TouchEvent).touches[0].clientY);
+    if (mouse_curr_screen_y === undefined) return;
+
+    const timeMarkers = document.querySelector(".time-markers");
+    const timeMarkersRect = timeMarkers?.getBoundingClientRect();
+
+    let border_curr_screen_y = border_orig_screen_y;
+    if (timeMarkersRect && isMouseInTimeMarkers(e, timeMarkersRect)) {
+      border_curr_screen_y = calculateSnappedY(mouse_curr_screen_y, timeMarkersRect);
+    } else {
+      border_curr_screen_y += mouse_curr_screen_y - mouse_orig_screen_y;
+    }
+
+    if (isResizingActivity && draggedActivityIndex !== null) {
+      const diffY = border_curr_screen_y - border_orig_screen_y;
+      handleActivityResize(diffY, draggedActivityIndex);
+    } else if (isResizingBorder && draggedBorderIndex !== null) {
+      handleBorderDrag(border_curr_screen_y, draggedBorderIndex, e);
+    }
+  };
+
+  /**
+   * Handles the end of the dragging process.
+   */
+  const endDrag = () => {
+    if (!isDragging.value) return;
+
+    isDragging.value = false;
+
+    if (draggedItem) {
+      if (isResizingActivity && draggedActivityIndex !== null) {
+        endActivityDrag();
+      } else if (isResizingBorder && draggedBorderIndex !== null) {
+        endBorderDrag();
+      }
+
+      draggedItem.style.cursor = "move";
+      draggedItem = null;
+      isResizingActivity = false;
+      isResizingBorder = false;
+      draggedActivityIndex = null;
+      draggedBorderIndex = null;
+    }
+  };
+
+  /**
+   * Handles the end of activity dragging.
+   */
+  const endActivityDrag = () => {
+    const activity = activityStore.getActivitiesForDay[draggedActivityIndex!];
+    activityStore.updateActivity(activity.id, {
+      duration: activity.duration,
+    });
+  };
+
+  /**
+   * Handles the end of border dragging.
+   */
+  const endBorderDrag = () => {
+    const activityA = activityStore.getActivitiesForDay[draggedBorderIndex!];
+    const activityB =
+      activityStore.getActivitiesForDay[draggedBorderIndex! + 1];
+    activityStore.updateActivity(activityA.id, {
+      duration: activityA.duration,
+    });
+    activityStore.updateActivity(activityB.id, {
+      startTime: activityB.startTime,
+      duration: activityB.duration,
+    });
+  };
+
+  // --- Resizing and Dragging Logic ---
+
+  /**
+   * Handles the resizing of an activity.
+   */
+  function handleActivityResize(
+    diffY: number,
+    draggedActivityIndex: number,
+  ) {
+    const currentActivity =
+      activityStore.getActivitiesForDay[draggedActivityIndex];
+    let newDuration = initialDuration + diffY;
+
+    if (newDuration > 0) {
+      activityStore.updateActivity(currentActivity.id, {
+        duration: newDuration,
+      });
+      updateActivityElementStyle(draggedActivityIndex, {
+        height: newDuration,
+      });
+
+      for (
+        let i = draggedActivityIndex + 1;
+        i < activityStore.getActivitiesForDay.length;
+        i++
+      ) {
+        const prevActivity = activityStore.getActivitiesForDay[i - 1];
+        const newStartTime = prevActivity.startTime + prevActivity.duration;
+        activityStore.updateActivity(activityStore.getActivitiesForDay[i].id, {
+          startTime: newStartTime,
+        });
+        updateActivityElementStyle(i, { top: newStartTime });
+      }
+    }
+  }
+
+  /**
+   * Handles the dragging of a border between activities.
+   */
+  function handleBorderDrag(
+    border_curr_screen_y: number,
+    draggedBorderIndex: number,
+    e: MouseEvent | TouchEvent,
+  ) {
+    if (
+      draggedBorderIndex < 0 ||
+      draggedBorderIndex >= activityStore.getActivitiesForDay.length - 1
+    ) {
+      return;
+    }
+
+    const activityA = activityStore.getActivitiesForDay[draggedBorderIndex];
+    const activityB = activityStore.getActivitiesForDay[draggedBorderIndex + 1];
+
+    const diffY = border_curr_screen_y - border_prev_screen_y;
+    const newDurationA = activityA.duration + diffY;
+    const newDurationB = activityB.duration - diffY;
+
+    if (newDurationA > 0 && newDurationB > 0) {
+      // Update durations and start time
+      activityStore.updateActivity(activityA.id, { duration: newDurationA });
+      activityStore.updateActivity(activityB.id, {
+        startTime: activityA.startTime + activityA.duration,
+        duration: newDurationB,
+      });
+
+      // Update element styles
+      updateActivityElementStyle(draggedBorderIndex, {
+        height: activityA.duration,
+      });
+      updateActivityElementStyle(draggedBorderIndex + 1, {
+        top: activityA.startTime + activityA.duration,
+        height: activityB.duration,
+      });
+
+      border_prev_screen_y = border_curr_screen_y;
+    }
+  }
+
+  // --- Event Listeners ---
 
   onMounted(() => {
-    let draggedItem: HTMLElement | null = null;
-    let initialY = 0;
-    let isResizingActivity = false;
-    let isResizingBorder = false;
-    let draggedActivityIndex: number | null = null;
-    let draggedBorderIndex: number | null = null;
-    let initialStartTime = 0;
-    let initialDuration = 0;
+    nextTick(() => {
+      const activityItems = document.querySelectorAll(".activity-item");
+      const activityBorders = document.querySelectorAll(".activity-border");
 
-    const activityItems = document.querySelectorAll(".activity-item");
-    const activityBorders = document.querySelectorAll(".activity-border");
-    const timeMarkers = document.querySelector(".time-markers");
-
-    const startDrag = (
-      e: MouseEvent | TouchEvent,
-      item: Element,
-      index: number,
-      isBorder: boolean,
-    ) => {
-      e.preventDefault();
-      draggedItem = item as HTMLElement;
-      initialY =
-        (e as MouseEvent).clientY ||
-        ((e as TouchEvent).touches && (e as TouchEvent).touches[0].clientY) ||
-        0;
-      if (isBorder) {
-        draggedBorderIndex = index;
-        isResizingBorder = true;
-        isResizingActivity = false;
-        console.log("touchstart/mousedown on border", { index, initialY });
-      } else {
-        draggedActivityIndex = index;
-        (item as HTMLElement).style.cursor = "ns-resize";
-        initialStartTime =
-          activityStore.getActivitiesForDay[draggedActivityIndex].startTime;
-        initialDuration =
-          activityStore.getActivitiesForDay[draggedActivityIndex].duration;
-        isResizingActivity = true;
-        isResizingBorder = false;
-        console.log("touchstart/mousedown on activity", {
-          index,
-          height:
-            activityStore.getActivitiesForDay[draggedActivityIndex].duration,
-          initialY,
-          initialStartTime,
-          initialDuration,
-        });
-      }
-    };
-
-    activityItems.forEach((item, index) => {
-      item.addEventListener("mousedown", (e) =>
-        startDrag(e, item, index, false),
-      );
-      item.addEventListener(
-        "touchstart",
-        (e) => {
-          startDrag(e, item, index, false);
-        },
-        { passive: true },
-      );
-    });
-
-    activityBorders.forEach((border, index) => {
-      border.addEventListener("mousedown", (e) => {
-        e.stopPropagation(); // Stop event from bubbling to activity
-        startDrag(e, border, index, true);
+      activityItems.forEach((item, index) => {
+        item.addEventListener("mousedown", (e) =>
+          startDrag(e, item, index, false),
+        );
+        item.addEventListener(
+          "touchstart",
+          (e) => {
+            startDrag(e, item, index, false);
+          },
+          { passive: true },
+        );
       });
-      border.addEventListener(
-        "touchstart",
-        (e) => {
+
+      activityBorders.forEach((border, index) => {
+        border.addEventListener("mousedown", (e) => {
           e.stopPropagation();
           startDrag(e, border, index, true);
-        },
-        { passive: true },
-      );
-    });
-
-    const moveDrag = (e: MouseEvent | TouchEvent) => {
-      if (!draggedItem) return;
-
-      let clientY =
-        (e as MouseEvent).clientY ||
-        ((e as TouchEvent).touches && (e as TouchEvent).touches[0].clientY);
-      if (clientY === undefined) return;
-
-      let diffY = clientY - initialY;
-      let snappedY = clientY;
-      let snappedEndTime: number | null = null;
-
-      // Check if the mouse is within the time marker column
-      if (timeMarkers) {
-        const timeMarkersRect = timeMarkers.getBoundingClientRect();
-        if (
-          ((e as MouseEvent).clientX >= timeMarkersRect.left &&
-            (e as MouseEvent).clientX <= timeMarkersRect.right) ||
-          ((e as TouchEvent).touches &&
-            (e as TouchEvent).touches[0].clientX >= timeMarkersRect.left &&
-            (e as TouchEvent).touches[0].clientX <= timeMarkersRect.right)
-        ) {
-          // Calculate the nearest hour
-          const hourHeight = 60;
-          const offset = timeMarkersRect.top;
-          const mouseY = clientY - offset;
-          const nearestHour = Math.round(mouseY / hourHeight);
-          snappedY = nearestHour * hourHeight + offset;
-          diffY = snappedY - initialY;
-
-          if (isResizingActivity && draggedActivityIndex !== null) {
-            const currentActivity =
-              activityStore.getActivitiesForDay[draggedActivityIndex];
-            snappedEndTime = nearestHour * hourHeight;
-          }
-        }
-      }
-
-      if (isResizingActivity && draggedActivityIndex !== null) {
-        handleActivityResize(
-          diffY,
-          draggedActivityIndex,
-          activityItems,
-          snappedY,
-          snappedEndTime,
+        });
+        border.addEventListener(
+          "touchstart",
+          (e) => {
+            e.stopPropagation();
+            startDrag(e, border, index, true);
+          },
+          { passive: true },
         );
-      } else if (isResizingBorder && draggedBorderIndex !== null) {
-        handleBorderDrag(diffY, draggedBorderIndex, activityItems, e, snappedY);
-      }
-    };
-
-    window.addEventListener("mousemove", moveDrag);
-    window.addEventListener("touchmove", moveDrag, { passive: true });
-
-    function handleActivityResize(
-      diffY: number,
-      draggedActivityIndex: number,
-      activityItems: NodeListOf<Element>,
-      snappedY: number,
-      snappedEndTime: number | null,
-    ) {
-      const currentActivity =
-        activityStore.getActivitiesForDay[draggedActivityIndex];
-      let newDuration = initialDuration + diffY;
-      let newEndTime = currentActivity.startTime + newDuration;
-
-      if (snappedEndTime !== null) {
-        newEndTime = snappedEndTime;
-        newDuration = newEndTime - currentActivity.startTime;
-      }
-
-      console.log("handleActivityResize before", {
-        diffY,
-        newDuration,
-        initialDuration,
-        currentActivity,
-        snappedEndTime,
-        newEndTime,
       });
 
-      if (newDuration > 0) {
-        // Adjust current activity
-        activityStore.updateActivity(currentActivity.id, {
-          duration: newDuration,
-        });
-        const activityElement = activityItems[
-          draggedActivityIndex
-        ] as HTMLElement;
-        if (activityElement instanceof HTMLElement) {
-          activityElement.style.height = `${newDuration}px`;
-        }
+      window.addEventListener("mousemove", moveDrag);
+      window.addEventListener("touchmove", moveDrag, { passive: true });
+      window.addEventListener("mouseup", endDrag);
+      window.addEventListener("touchend", endDrag);
 
-        // Adjust subsequent activity positions
-        for (
-          let i = draggedActivityIndex + 1;
-          i < activityStore.getActivitiesForDay.length;
-          i++
-        ) {
-          const prevActivity = activityStore.getActivitiesForDay[i - 1];
-          const newStartTime = prevActivity.startTime + prevActivity.duration;
-          activityStore.updateActivity(
-            activityStore.getActivitiesForDay[i].id,
-            { startTime: newStartTime },
-          );
-          const activityElement = activityItems[i] as HTMLElement;
-          if (activityElement instanceof HTMLElement) {
-            activityElement.style.top = `${newStartTime}px`;
-          }
-        }
-        console.log("handleActivityResize after", {
-          diffY,
-          newDuration,
-          currentActivity,
-        });
-      } else {
-        console.log("handleActivityResize: newDuration out of bounds", {
-          newDuration,
-          currentActivity,
+      for (let i = 0; i < activityStore.getActivitiesForDay.length; i++) {
+        updateActivityElementStyle(i, {
+          top: activityStore.getActivitiesForDay[i].startTime,
+          height: activityStore.getActivitiesForDay[i].duration,
         });
       }
-    }
-
-    function handleBorderDrag(
-      diffY: number,
-      draggedBorderIndex: number,
-      activityItems: NodeListOf<Element>,
-      e: MouseEvent | TouchEvent,
-      snappedY: number,
-    ) {
-      if (
-        draggedBorderIndex < 0 ||
-        draggedBorderIndex >= activityStore.getActivitiesForDay.length - 1
-      ) {
-        console.log("handleBorderResize: draggedBorderIndex out of bounds");
-        return;
-      }
-      const activityA = activityStore.getActivitiesForDay[draggedBorderIndex];
-      const activityB =
-        activityStore.getActivitiesForDay[draggedBorderIndex + 1];
-
-      let newDurationA = activityA.duration + diffY;
-      let newDurationB = activityB.duration - diffY;
-
-      let snappedDiffY = snappedY - initialY;
-      let snappedDurationA = activityA.duration + snappedDiffY;
-      let snappedDurationB = activityB.duration - snappedDiffY;
-
-      if (newDurationA > 0 && newDurationB > 0) {
-        // Adjust activity properties
-        activityStore.updateActivity(activityA.id, { duration: newDurationA });
-        activityStore.updateActivity(activityB.id, {
-          startTime: activityA.startTime + newDurationA,
-          duration: newDurationB,
-        });
-
-        // Update visual elements
-        const activityAElement = activityItems[
-          draggedBorderIndex
-        ] as HTMLElement;
-        if (activityAElement instanceof HTMLElement) {
-          activityAElement.style.height = `${newDurationA}px`;
-        }
-
-        const activityBElement = activityItems[
-          draggedBorderIndex + 1
-        ] as HTMLElement;
-        if (activityBElement instanceof HTMLElement) {
-          activityBElement.style.top = `${activityB.startTime}px`;
-          activityBElement.style.height = `${newDurationB}px`;
-        }
-
-        // Adjust subsequent activities
-        for (
-          let i = draggedBorderIndex + 2;
-          i < activityStore.getActivitiesForDay.length;
-          i++
-        ) {
-          const prevActivity = activityStore.getActivitiesForDay[i - 1];
-          const newStartTime = prevActivity.startTime + prevActivity.duration;
-          activityStore.updateActivity(
-            activityStore.getActivitiesForDay[i].id,
-            { startTime: newStartTime },
-          );
-          const activityElement = activityItems[i] as HTMLElement;
-          if (activityElement instanceof HTMLElement) {
-            activityElement.style.top = `${newStartTime}px`;
-          }
-        }
-      } else {
-        // Handle cases where durations become invalid (e.g., zero or negative)
-        console.log("handleBorderResize: newDuration out of bounds");
-      }
-      initialY = snappedY; // Reset initialY to current mouse position
-    }
-
-    const endDrag = () => {
-      if (draggedItem) {
-        if (isResizingActivity && draggedActivityIndex !== null) {
-          updateActivityResize(draggedActivityIndex, activityItems);
-        }
-        draggedItem.style.cursor = "move";
-        draggedItem = null;
-        isResizingActivity = false;
-        isResizingBorder = false;
-        console.log("mouseup/touchend", {
-          draggedActivityIndex,
-          isResizingActivity,
-          isResizingBorder,
-        });
-      }
-    };
-
-    window.addEventListener("mouseup", endDrag);
-    window.addEventListener("touchend", endDrag);
-
-    function updateActivityResize(
-      draggedActivityIndex: number,
-      activityItems: NodeListOf<Element>,
-    ) {
-      const currentActivity =
-        activityStore.getActivitiesForDay[draggedActivityIndex];
-      let newDuration = currentActivity.duration;
-
-      if (newDuration > 0) {
-        // Adjust subsequent activities
-        for (
-          let i = draggedActivityIndex + 1;
-          i < activityStore.getActivitiesForDay.length;
-          i++
-        ) {
-          const prevActivity = activityStore.getActivitiesForDay[i - 1];
-          const newStartTime = prevActivity.startTime + prevActivity.duration;
-          activityStore.updateActivity(
-            activityStore.getActivitiesForDay[i].id,
-            { startTime: newStartTime },
-          );
-          const activityElement = activityItems[i] as HTMLElement;
-          if (activityElement instanceof HTMLElement) {
-            activityElement.style.top = `${newStartTime}px`;
-          }
-        }
-        console.log("updateActivityResize", { newDuration, currentActivity });
-      }
-    }
-
-    // Initial positioning of activities
-    for (
-      let i = 0;
-      i < activityStore.getActivitiesForDay.length;
-      i++
-    ) {
-      const activityElement = activityItems[i] as HTMLElement;
-      if (activityElement instanceof HTMLElement) {
-        activityElement.style.top = `${activityStore.getActivitiesForDay[i].startTime}px`;
-        activityElement.style.height = `${activityStore.getActivitiesForDay[i].duration}px`;
-      }
-    }
+    });
   });
 
-  return {};
+  onUnmounted(() => {
+    window.removeEventListener("mousemove", moveDrag);
+    window.removeEventListener("touchmove", moveDrag);
+    window.removeEventListener("mouseup", endDrag);
+    window.removeEventListener("touchend", endDrag);
+  });
+
+  return { startDrag, moveDrag, endDrag };
 }
