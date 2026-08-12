@@ -1,18 +1,8 @@
-import { onMounted, ref } from "vue";
+import { onMounted } from "vue";
+import { useActivityStore } from "../store/activityStore";
 
 export function useDragAndDrop() {
-  const activities = ref([
-    { id: 1, name: "Morning Routine", startTime: 0, duration: 100 },
-    { id: 2, name: "Work Session", startTime: 100, duration: 200 },
-    { id: 3, name: "Lunch Break", startTime: 300, duration: 80 },
-    { id: 4, name: "Afternoon Tasks", startTime: 380, duration: 150 },
-    { id: 5, name: "Evening Tasks", startTime: 530, duration: 100 },
-    { id: 6, name: "Dinner", startTime: 630, duration: 60 },
-    { id: 7, name: "Relax", startTime: 690, duration: 120 },
-    { id: 8, name: "Bedtime Routine", startTime: 810, duration: 60 },
-    { id: 9, name: "Sleep", startTime: 870, duration: 570 },
-    { id: 10, name: "Wake Up", startTime: 1440, duration: 0 },
-  ]);
+  const activityStore = useActivityStore();
 
   onMounted(() => {
     let draggedItem: HTMLElement | null = null;
@@ -48,13 +38,16 @@ export function useDragAndDrop() {
       } else {
         draggedActivityIndex = index;
         (item as HTMLElement).style.cursor = "ns-resize";
-        initialStartTime = activities.value[draggedActivityIndex].startTime;
-        initialDuration = activities.value[draggedActivityIndex].duration;
+        initialStartTime =
+          activityStore.getActivitiesForDay[draggedActivityIndex].startTime;
+        initialDuration =
+          activityStore.getActivitiesForDay[draggedActivityIndex].duration;
         isResizingActivity = true;
         isResizingBorder = false;
         console.log("touchstart/mousedown on activity", {
           index,
-          height: activities.value[draggedActivityIndex].duration,
+          height:
+            activityStore.getActivitiesForDay[draggedActivityIndex].duration,
           initialY,
           initialStartTime,
           initialDuration,
@@ -121,7 +114,8 @@ export function useDragAndDrop() {
           diffY = snappedY - initialY;
 
           if (isResizingActivity && draggedActivityIndex !== null) {
-            const currentActivity = activities.value[draggedActivityIndex];
+            const currentActivity =
+              activityStore.getActivitiesForDay[draggedActivityIndex];
             snappedEndTime = nearestHour * hourHeight;
           }
         }
@@ -150,7 +144,8 @@ export function useDragAndDrop() {
       snappedY: number,
       snappedEndTime: number | null,
     ) {
-      const currentActivity = activities.value[draggedActivityIndex];
+      const currentActivity =
+        activityStore.getActivitiesForDay[draggedActivityIndex];
       let newDuration = initialDuration + diffY;
       let newEndTime = currentActivity.startTime + newDuration;
 
@@ -170,23 +165,32 @@ export function useDragAndDrop() {
 
       if (newDuration > 0) {
         // Adjust current activity
-        currentActivity.duration = newDuration;
+        activityStore.updateActivity(currentActivity.id, {
+          duration: newDuration,
+        });
         const activityElement = activityItems[
           draggedActivityIndex
         ] as HTMLElement;
-        activityElement.style.height = `${newDuration}px`;
+        if (activityElement instanceof HTMLElement) {
+          activityElement.style.height = `${newDuration}px`;
+        }
 
         // Adjust subsequent activity positions
         for (
           let i = draggedActivityIndex + 1;
-          i < activities.value.length;
+          i < activityStore.getActivitiesForDay.length;
           i++
         ) {
-          activities.value[i].startTime =
-            activities.value[i - 1].startTime +
-            activities.value[i - 1].duration;
+          const prevActivity = activityStore.getActivitiesForDay[i - 1];
+          const newStartTime = prevActivity.startTime + prevActivity.duration;
+          activityStore.updateActivity(
+            activityStore.getActivitiesForDay[i].id,
+            { startTime: newStartTime },
+          );
           const activityElement = activityItems[i] as HTMLElement;
-          activityElement.style.top = `${activities.value[i].startTime}px`;
+          if (activityElement instanceof HTMLElement) {
+            activityElement.style.top = `${newStartTime}px`;
+          }
         }
         console.log("handleActivityResize after", {
           diffY,
@@ -210,13 +214,14 @@ export function useDragAndDrop() {
     ) {
       if (
         draggedBorderIndex < 0 ||
-        draggedBorderIndex >= activities.value.length - 1
+        draggedBorderIndex >= activityStore.getActivitiesForDay.length - 1
       ) {
         console.log("handleBorderResize: draggedBorderIndex out of bounds");
         return;
       }
-      const activityA = activities.value[draggedBorderIndex];
-      const activityB = activities.value[draggedBorderIndex + 1];
+      const activityA = activityStore.getActivitiesForDay[draggedBorderIndex];
+      const activityB =
+        activityStore.getActivitiesForDay[draggedBorderIndex + 1];
 
       let newDurationA = activityA.duration + diffY;
       let newDurationB = activityB.duration - diffY;
@@ -227,29 +232,44 @@ export function useDragAndDrop() {
 
       if (newDurationA > 0 && newDurationB > 0) {
         // Adjust activity properties
-        activityA.duration = newDurationA;
-        activityB.startTime = activityA.startTime + newDurationA;
-        activityB.duration = newDurationB;
+        activityStore.updateActivity(activityA.id, { duration: newDurationA });
+        activityStore.updateActivity(activityB.id, {
+          startTime: activityA.startTime + newDurationA,
+          duration: newDurationB,
+        });
 
         // Update visual elements
         const activityAElement = activityItems[
           draggedBorderIndex
         ] as HTMLElement;
-        activityAElement.style.height = `${newDurationA}px`;
+        if (activityAElement instanceof HTMLElement) {
+          activityAElement.style.height = `${newDurationA}px`;
+        }
 
         const activityBElement = activityItems[
           draggedBorderIndex + 1
         ] as HTMLElement;
-        activityBElement.style.top = `${activityB.startTime}px`;
-        activityBElement.style.height = `${newDurationB}px`;
+        if (activityBElement instanceof HTMLElement) {
+          activityBElement.style.top = `${activityB.startTime}px`;
+          activityBElement.style.height = `${newDurationB}px`;
+        }
 
         // Adjust subsequent activities
-        for (let i = draggedBorderIndex + 2; i < activities.value.length; i++) {
-          activities.value[i].startTime =
-            activities.value[i - 1].startTime +
-            activities.value[i - 1].duration;
+        for (
+          let i = draggedBorderIndex + 2;
+          i < activityStore.getActivitiesForDay.length;
+          i++
+        ) {
+          const prevActivity = activityStore.getActivitiesForDay[i - 1];
+          const newStartTime = prevActivity.startTime + prevActivity.duration;
+          activityStore.updateActivity(
+            activityStore.getActivitiesForDay[i].id,
+            { startTime: newStartTime },
+          );
           const activityElement = activityItems[i] as HTMLElement;
-          activityElement.style.top = `${activities.value[i].startTime}px`;
+          if (activityElement instanceof HTMLElement) {
+            activityElement.style.top = `${newStartTime}px`;
+          }
         }
       } else {
         // Handle cases where durations become invalid (e.g., zero or negative)
@@ -282,33 +302,45 @@ export function useDragAndDrop() {
       draggedActivityIndex: number,
       activityItems: NodeListOf<Element>,
     ) {
-      const currentActivity = activities.value[draggedActivityIndex];
+      const currentActivity =
+        activityStore.getActivitiesForDay[draggedActivityIndex];
       let newDuration = currentActivity.duration;
 
       if (newDuration > 0) {
         // Adjust subsequent activities
         for (
           let i = draggedActivityIndex + 1;
-          i < activities.value.length;
+          i < activityStore.getActivitiesForDay.length;
           i++
         ) {
-          activities.value[i].startTime =
-            activities.value[i - 1].startTime +
-            activities.value[i - 1].duration;
+          const prevActivity = activityStore.getActivitiesForDay[i - 1];
+          const newStartTime = prevActivity.startTime + prevActivity.duration;
+          activityStore.updateActivity(
+            activityStore.getActivitiesForDay[i].id,
+            { startTime: newStartTime },
+          );
           const activityElement = activityItems[i] as HTMLElement;
-          activityElement.style.top = `${activities.value[i].startTime}px`;
+          if (activityElement instanceof HTMLElement) {
+            activityElement.style.top = `${newStartTime}px`;
+          }
         }
         console.log("updateActivityResize", { newDuration, currentActivity });
       }
     }
 
     // Initial positioning of activities
-    for (let i = 0; i < activities.value.length; i++) {
+    for (
+      let i = 0;
+      i < activityStore.getActivitiesForDay.length;
+      i++
+    ) {
       const activityElement = activityItems[i] as HTMLElement;
-      activityElement.style.top = `${activities.value[i].startTime}px`;
-      activityElement.style.height = `${activities.value[i].duration}px`;
+      if (activityElement instanceof HTMLElement) {
+        activityElement.style.top = `${activityStore.getActivitiesForDay[i].startTime}px`;
+        activityElement.style.height = `${activityStore.getActivitiesForDay[i].duration}px`;
+      }
     }
   });
 
-  return { activities };
+  return {};
 }

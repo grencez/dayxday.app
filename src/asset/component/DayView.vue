@@ -14,7 +14,7 @@
     </div>
     <div class="activity-list">
       <div
-        v-for="(activity, index) in activities"
+        v-for="(activity, index) in activityStore.getActivitiesForDay"
         :key="activity.id"
         class="activity-item"
         :style="{
@@ -36,9 +36,12 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { useDragAndDrop } from "../composable/useDragAndDrop";
+import { useActivityStore } from "../store/activityStore";
+import { onMounted } from "vue";
 import Activity from "./Activity.vue";
+import { Activity as ActivityModel } from "../model/Activity";
 
 export default {
   name: "DayView",
@@ -46,7 +49,24 @@ export default {
     Activity,
   },
   setup() {
-    const { activities } = useDragAndDrop();
+    const activityStore = useActivityStore();
+    useDragAndDrop();
+
+    onMounted(() => {
+      const initialActivities: ActivityModel[] = [
+        { id: 1, name: "Morning Routine", startTime: 0, duration: 100 },
+        { id: 2, name: "Work Session", startTime: 100, duration: 200 },
+        { id: 3, name: "Lunch Break", startTime: 300, duration: 80 },
+        { id: 4, name: "Afternoon Tasks", startTime: 380, duration: 150 },
+        { id: 5, name: "Evening Tasks", startTime: 530, duration: 100 },
+        { id: 6, name: "Dinner", startTime: 630, duration: 60 },
+        { id: 7, name: "Relax", startTime: 690, duration: 120 },
+        { id: 8, name: "Bedtime Routine", startTime: 810, duration: 60 },
+        { id: 9, name: "Sleep", startTime: 870, duration: 570 },
+        { id: 10, name: "Wake Up", startTime: 1440, duration: 0 },
+      ];
+      activityStore.initializeActivities(initialActivities);
+    });
 
     // Include 24 to show the final 00:00
     const hours = Array.from({ length: 25 }, (_, i) => i);
@@ -65,7 +85,7 @@ export default {
     };
 
     return {
-      activities,
+      activityStore,
       hours,
       formatTime,
       makeEditable,
