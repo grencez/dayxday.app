@@ -18,8 +18,8 @@
         :key="activity.id"
         class="activity-item"
         :style="{
-          top: activity.startTime + 'px',
-          height: activity.duration + 'px',
+          top: activity.start_time_minutes + 'px',
+          height: activity.duration_minutes + 'px',
         }"
         :contenteditable="false"
         @dblclick="makeEditable"
@@ -38,10 +38,9 @@
 
 <script lang="ts">
 import { useDragAndDrop } from "../composable/useDragAndDrop";
-import { useActivityStore } from "../store/activity";
+import { useActivityStore, Activity } from "../store/activity";
 import { onMounted } from "vue";
 import ActivityItem from "../component/ActivityItem.vue";
-import { Activity as ActivityModel } from "../model/Activity";
 import { useTimeFormatter } from "../composable/useTimeFormatter";
 
 export default {
@@ -54,17 +53,17 @@ export default {
     useDragAndDrop();
 
     onMounted(() => {
-      const initialActivities: ActivityModel[] = [
-        { id: 1, name: "Morning Routine", startTime: 0, duration: 100 },
-        { id: 2, name: "Work Session", startTime: 100, duration: 200 },
-        { id: 3, name: "Lunch Break", startTime: 300, duration: 80 },
-        { id: 4, name: "Afternoon Tasks", startTime: 380, duration: 150 },
-        { id: 5, name: "Evening Tasks", startTime: 530, duration: 100 },
-        { id: 6, name: "Dinner", startTime: 630, duration: 60 },
-        { id: 7, name: "Relax", startTime: 690, duration: 120 },
-        { id: 8, name: "Bedtime Routine", startTime: 810, duration: 60 },
-        { id: 9, name: "Sleep", startTime: 870, duration: 570 },
-        { id: 10, name: "Wake Up", startTime: 1440, duration: 0 },
+      const initialActivities: Activity[] = [
+        { id: 1, name: "Morning Routine", start_time_minutes: 0, duration_minutes: 100 },
+        { id: 2, name: "Work Session", start_time_minutes: 100, duration_minutes: 200 },
+        { id: 3, name: "Lunch Break", start_time_minutes: 300, duration_minutes: 80 },
+        { id: 4, name: "Afternoon Tasks", start_time_minutes: 380, duration_minutes: 150 },
+        { id: 5, name: "Evening Tasks", start_time_minutes: 530, duration_minutes: 100 },
+        { id: 6, name: "Dinner", start_time_minutes: 630, duration_minutes: 60 },
+        { id: 7, name: "Relax", start_time_minutes: 690, duration_minutes: 120 },
+        { id: 8, name: "Bedtime Routine", start_time_minutes: 810, duration_minutes: 60 },
+        { id: 9, name: "Sleep", start_time_minutes: 870, duration_minutes: 570 },
+        { id: 10, name: "Wake Up", start_time_minutes: 1440, duration_minutes: 0 },
       ];
       activityStore.initializeActivities(initialActivities);
     });

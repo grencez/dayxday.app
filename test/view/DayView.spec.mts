@@ -3,8 +3,7 @@ import DayView from "@/view/DayView.vue";
 import { describe, it, expect, beforeEach } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { createPinia, setActivePinia } from "pinia";
-import { useActivityStore } from "@/store/activity";
-import { Activity } from "@/model/Activity";
+import { useActivityStore, Activity } from "@/store/activity";
 
 describe("DayView.vue", () => {
   beforeEach(async () => {
@@ -13,17 +12,22 @@ describe("DayView.vue", () => {
     // Create a new Pinia instance before each test
     setActivePinia(createPinia());
     const activityStore = useActivityStore();
-    const activities = [
-      new Activity(1, "Activity 1", 0, 60),
-      new Activity(2, "Activity 2", 60, 60),
-      new Activity(3, "Activity 3", 120, 60),
-      new Activity(4, "Activity 4", 180, 60),
-      new Activity(5, "Activity 5", 240, 60),
-      new Activity(6, "Activity 6", 300, 60),
-      new Activity(7, "Activity 7", 360, 60),
-      new Activity(8, "Activity 8", 420, 60),
-      new Activity(9, "Activity 9", 480, 60),
-      new Activity(10, "Activity 10", 540, 60),
+    const activities: Activity[] = [
+      { id: 1, name: "Activity 1", start_time_minutes: 0, duration_minutes: 60 },
+      { id: 2, name: "Activity 2", start_time_minutes: 60, duration_minutes: 60 },
+      { id: 3, name: "Activity 3", start_time_minutes: 120, duration_minutes: 60 },
+      { id: 4, name: "Activity 4", start_time_minutes: 180, duration_minutes: 60 },
+      { id: 5, name: "Activity 5", start_time_minutes: 240, duration_minutes: 60 },
+      { id: 6, name: "Activity 6", start_time_minutes: 300, duration_minutes: 60 },
+      { id: 7, name: "Activity 7", start_time_minutes: 360, duration_minutes: 60 },
+      { id: 8, name: "Activity 8", start_time_minutes: 420, duration_minutes: 60 },
+      { id: 9, name: "Activity 9", start_time_minutes: 480, duration_minutes: 60 },
+      {
+        id: 10,
+        name: "Activity 10",
+        start_time_minutes: 540,
+        duration_minutes: 60,
+      },
     ];
     await activityStore.initializeActivities(activities);
   });

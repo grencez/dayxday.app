@@ -64,10 +64,9 @@ export function useDragAndDrop() {
       index
     ] as HTMLElement;
     initialDuration =
-      activityStore.getActivitiesForDay[draggedBorderIndex].duration;
+      activityStore.getActivitiesForDay[draggedBorderIndex].duration_minutes;
     initialStartTime =
-      initialDuration +
-      activityStore.getActivitiesForDay[draggedBorderIndex].startTime;
+      activityStore.getActivitiesForDay[draggedBorderIndex].start_time_minutes;
 
     border_orig_screen_y = borderElement.getBoundingClientRect().top;
   };
@@ -79,9 +78,9 @@ export function useDragAndDrop() {
     draggedActivityIndex = index;
     (item as HTMLElement).style.cursor = "ns-resize";
     initialStartTime =
-      activityStore.getActivitiesForDay[draggedActivityIndex].startTime;
+      activityStore.getActivitiesForDay[draggedActivityIndex].start_time_minutes;
     initialDuration =
-      activityStore.getActivitiesForDay[draggedActivityIndex].duration;
+      activityStore.getActivitiesForDay[draggedActivityIndex].duration_minutes;
     isResizingActivity = true;
     isResizingBorder = false;
 
@@ -154,7 +153,7 @@ export function useDragAndDrop() {
   const endActivityDrag = () => {
     const activity = activityStore.getActivitiesForDay[draggedActivityIndex!];
     activityStore.updateActivity(activity.id, {
-      duration: activity.duration,
+      duration_minutes: activity.duration_minutes,
     });
   };
 
@@ -166,11 +165,11 @@ export function useDragAndDrop() {
     const activityB =
       activityStore.getActivitiesForDay[draggedBorderIndex! + 1];
     activityStore.updateActivity(activityA.id, {
-      duration: activityA.duration,
+      duration_minutes: activityA.duration_minutes,
     });
     activityStore.updateActivity(activityB.id, {
-      startTime: activityB.startTime,
-      duration: activityB.duration,
+      start_time_minutes: activityB.start_time_minutes,
+      duration_minutes: activityB.duration_minutes,
     });
   };
 
@@ -186,7 +185,7 @@ export function useDragAndDrop() {
 
     if (newDuration > 0) {
       activityStore.updateActivity(currentActivity.id, {
-        duration: newDuration,
+        duration_minutes: newDuration,
       });
       updateActivityElementStyle(draggedActivityIndex, {
         height: newDuration,
@@ -198,9 +197,9 @@ export function useDragAndDrop() {
         i++
       ) {
         const prevActivity = activityStore.getActivitiesForDay[i - 1];
-        const newStartTime = prevActivity.startTime + prevActivity.duration;
+        const newStartTime = prevActivity.start_time_minutes + prevActivity.duration_minutes;
         activityStore.updateActivity(activityStore.getActivitiesForDay[i].id, {
-          startTime: newStartTime,
+          start_time_minutes: newStartTime,
         });
         updateActivityElementStyle(i, { top: newStartTime });
       }
@@ -225,24 +224,24 @@ export function useDragAndDrop() {
     const activityB = activityStore.getActivitiesForDay[draggedBorderIndex + 1];
 
     const diffY = border_curr_screen_y - border_prev_screen_y;
-    const newDurationA = activityA.duration + diffY;
-    const newDurationB = activityB.duration - diffY;
+    const newDurationA = activityA.duration_minutes + diffY;
+    const newDurationB = activityB.duration_minutes - diffY;
 
     if (newDurationA > 0 && newDurationB > 0) {
       // Update durations and start time
-      activityStore.updateActivity(activityA.id, { duration: newDurationA });
+      activityStore.updateActivity(activityA.id, { duration_minutes: newDurationA });
       activityStore.updateActivity(activityB.id, {
-        startTime: activityA.startTime + activityA.duration,
-        duration: newDurationB,
+        start_time_minutes: activityA.start_time_minutes + activityA.duration_minutes,
+        duration_minutes: newDurationB,
       });
 
       // Update element styles
       updateActivityElementStyle(draggedBorderIndex, {
-        height: activityA.duration,
+        height: activityA.duration_minutes,
       });
       updateActivityElementStyle(draggedBorderIndex + 1, {
-        top: activityA.startTime + activityA.duration,
-        height: activityB.duration,
+        top: activityA.start_time_minutes + activityA.duration_minutes,
+        height: activityB.duration_minutes,
       });
 
       border_prev_screen_y = border_curr_screen_y;
@@ -291,8 +290,8 @@ export function useDragAndDrop() {
 
       for (let i = 0; i < activityStore.getActivitiesForDay.length; i++) {
         updateActivityElementStyle(i, {
-          top: activityStore.getActivitiesForDay[i].startTime,
-          height: activityStore.getActivitiesForDay[i].duration,
+          top: activityStore.getActivitiesForDay[i].start_time_minutes,
+          height: activityStore.getActivitiesForDay[i].duration_minutes,
         });
       }
     });

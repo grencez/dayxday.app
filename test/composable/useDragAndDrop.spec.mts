@@ -3,9 +3,8 @@ import { ref, defineComponent, nextTick } from "vue";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
-import { Activity } from "@/model/Activity";
 import { createPinia, setActivePinia } from "pinia";
-import { useActivityStore } from "@/store/activity";
+import { useActivityStore, Activity } from "@/store/activity";
 
 describe("useDragAndDrop", () => {
   const activities = ref<Activity[] | null>(null);
@@ -32,9 +31,9 @@ describe("useDragAndDrop", () => {
 
     const activityStore = useActivityStore();
     activities.value = [
-      new Activity(1, "Activity A", 100, 100),
-      new Activity(2, "Activity B", 200, 100),
-      new Activity(3, "Activity C", 300, 100),
+      { id: 1, name: "Activity A", start_time_minutes: 100, duration_minutes: 100 },
+      { id: 2, name: "Activity B", start_time_minutes: 200, duration_minutes: 100 },
+      { id: 3, name: "Activity C", start_time_minutes: 300, duration_minutes: 100 },
     ];
     activityStore.initializeActivities(activities.value);
 
@@ -127,9 +126,9 @@ describe("useDragAndDrop", () => {
 
     expect(wrapper.vm.activities).not.toBeNull();
     if (wrapper.vm.activities) {
-      const initialStartTimeA = wrapper.vm.activities[0].startTime;
+      const initialStartTimeA = wrapper.vm.activities[0].start_time_minutes;
       const initialEndTimeB =
-        wrapper.vm.activities[1].startTime + wrapper.vm.activities[1].duration;
+        wrapper.vm.activities[1].start_time_minutes + wrapper.vm.activities[1].duration_minutes;
 
       // Simulate mousedown on the border between A and B
       const mousedownEvent = new MouseEvent("mousedown", { clientY: 150 });
@@ -141,9 +140,9 @@ describe("useDragAndDrop", () => {
       endDrag();
 
       // Assert that start time of A and end time of B have not changed
-      expect(wrapper.vm.activities[0].startTime).toBe(initialStartTimeA);
+      expect(wrapper.vm.activities[0].start_time_minutes).toBe(initialStartTimeA);
       expect(
-        wrapper.vm.activities[1].startTime + wrapper.vm.activities[1].duration,
+        wrapper.vm.activities[1].start_time_minutes + wrapper.vm.activities[1].duration_minutes,
       ).toBe(initialEndTimeB);
     }
   });
@@ -164,13 +163,13 @@ describe("useDragAndDrop", () => {
     endDrag();
 
     // Assert that the activity's end time snaped to the nearest hour marker
-    const newDuration = wrapper.vm.activities[0].duration;
+    const newDuration = wrapper.vm.activities[0].duration_minutes;
 
     // Calculate what the snapped end time should have been
     const nearestHour = Math.round(180 / 60); // 60 is the height of an hour
     const expectedSnappedEndTime = nearestHour * 60;
     const expectedSnappedDuration =
-      expectedSnappedEndTime - wrapper.vm.activities[0].startTime;
+      expectedSnappedEndTime - wrapper.vm.activities[0].start_time_minutes;
 
     expect(newDuration).toBe(expectedSnappedDuration);
   });
@@ -178,7 +177,7 @@ describe("useDragAndDrop", () => {
   it("should not snap when resizing and mouse is outside time markers area", async () => {
     await nextTick();
 
-    const initialDuration = wrapper.vm.activities[0].duration;
+    const initialDuration = wrapper.vm.activities[0].duration_minutes;
 
     // Simulate mousedown on the first activity to start resizing
     const mousedownEvent = new MouseEvent("mousedown", { clientY: 150 });
@@ -193,7 +192,7 @@ describe("useDragAndDrop", () => {
     endDrag();
 
     // Assert that the activity's duration changed proportionally to the mouse movement
-    const newDuration = wrapper.vm.activities[0].duration;
+    const newDuration = wrapper.vm.activities[0].duration_minutes;
     const expectedDuration = initialDuration + (185 - 150); // Mouse moved 35 pixels
 
     expect(newDuration).toBe(expectedDuration);

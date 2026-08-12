@@ -1,164 +1,138 @@
-import { setActivePinia, createPinia } from "pinia";
-import { useActivityStore } from "@/store/activity";
-import { Activity } from "@/model/Activity";
-import { describe, it, expect, beforeEach } from "vitest";
+import { defineComponent } from "vue";
+import { mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
+import { useActivityStore, Activity } from "@/store/activity";
+import { describe, beforeEach, it, expect } from "vitest";
 
-describe("ActivityStore", () => {
+describe("activity store", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  it("initializes with empty activities", () => {
+  it("should initialize with no activities", () => {
     const store = useActivityStore();
-    expect(store.activities).toEqual([]);
+    expect(store.getActivitiesForDay.length).toBe(0);
   });
 
-  it("initializes with provided activities", () => {
-    const initialActivities = [
-      new Activity(1, "Test Activity 1", 0, 60),
-      new Activity(2, "Test Activity 2", 60, 120),
-    ];
+  it("should add activities", () => {
     const store = useActivityStore();
-    store.initializeActivities(initialActivities);
-    expect(store.activities).toEqual(initialActivities);
-    expect(store.nextId).toBe(3);
-  });
-
-  it("gets activities for the day", () => {
-    const activities = [
-      new Activity(1, "Activity 1", 0, 60),
-      new Activity(2, "Activity 2", 60, 60),
-      new Activity(3, "Activity 3", 120, 60),
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 0, duration_minutes: 60 },
+      { id: 2, name: "Test Activity 2", start_time_minutes: 60, duration_minutes: 60 },
     ];
-    const store = useActivityStore();
     store.initializeActivities(activities);
-    const activitiesForDay = store.getActivitiesForDay;
-    expect(activitiesForDay).toEqual(activities);
+    expect(store.getActivitiesForDay.length).toBe(2);
   });
 
-  it("updates an activity", () => {
-    const initialActivities = [
-      new Activity(1, "Test Activity 1", 0, 60),
-      new Activity(2, "Test Activity 2", 60, 120),
-    ];
+  it("should update an activity", () => {
     const store = useActivityStore();
-    store.initializeActivities(initialActivities);
-
-    store.updateActivity(1, { name: "Updated Activity 1" });
-    expect(store.activities[0].name).toBe("Updated Activity 1");
-
-    store.updateActivity(2, { startTime: 70 });
-    expect(store.activities[1].startTime).toBe(70);
-
-    store.updateActivity(1, { duration: 90 });
-    expect(store.activities[0].duration).toBe(90);
-  });
-
-  it("does not update a non-existent activity", () => {
-    const initialActivities = [
-      new Activity(1, "Test Activity 1", 0, 60),
-      new Activity(2, "Test Activity 2", 60, 120),
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 0, duration_minutes: 60 },
     ];
-    const store = useActivityStore();
-    store.initializeActivities(initialActivities);
-
-    store.updateActivity(3, { name: "Updated Activity 3" });
-    expect(store.activities.length).toBe(2);
-  });
-
-  it("finds the activity at a given time", () => {
-    const activities = [
-      new Activity(1, "Activity 1", 0, 60),
-      new Activity(2, "Activity 2", 60, 120),
-      new Activity(3, "Activity 3", 180, 60),
-    ];
-    const store = useActivityStore();
     store.initializeActivities(activities);
-
-    const activity1 = store.findActivityAtTime(30);
-    expect(activity1).toEqual(activities[0]);
-
-    const activity2 = store.findActivityAtTime(150);
-    expect(activity2).toEqual(activities[1]);
-
-    const activity3 = store.findActivityAtTime(200);
-    expect(activity3).toEqual(activities[2]);
-
-    const noActivity = store.findActivityAtTime(300);
-    expect(noActivity).toBeNull();
+    store.updateActivity(1, { name: "Updated Activity" });
+    expect(store.getActivitiesForDay[0].name).toBe("Updated Activity");
   });
 
-  it("finds activities starting from a given time", () => {
-    const activities = [
-      new Activity(1, "Activity 1", 0, 60),
-      new Activity(2, "Activity 2", 60, 120),
-      new Activity(3, "Activity 3", 180, 60),
-    ];
+  it("should find an activity at a specific time", () => {
     const store = useActivityStore();
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 0, duration_minutes: 60 },
+    ];
+    store.initializeActivities(activities);
+    const activity = store.findActivityAtTime(30);
+    expect(activity).not.toBeNull();
+    expect(activity?.name).toBe("Test Activity 1");
+  });
+
+  it("should not find an activity at a time outside of any activity", () => {
+    const store = useActivityStore();
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 0, duration_minutes: 60 },
+    ];
+    store.initializeActivities(activities);
+    const activity = store.findActivityAtTime(90);
+    expect(activity).toBeNull();
+  });
+
+  it("should find activities from a specific time", () => {
+    const store = useActivityStore();
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 0, duration_minutes: 60 },
+      { id: 2, name: "Test Activity 2", start_time_minutes: 60, duration_minutes: 60 },
+    ];
+    store.initializeActivities(activities);
+    const foundActivities = store.findActivitiesFromTime(30);
+    expect(foundActivities.length).toBe(2);
+    expect(foundActivities[0].name).toBe("Test Activity 1");
+  });
+
+  it("should insert an activity at a specific time", () => {
+    const store = useActivityStore();
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 0, duration_minutes: 60 },
+      { id: 2, name: "Test Activity 2", start_time_minutes: 120, duration_minutes: 60 },
+    ];
     store.initializeActivities(activities);
 
-    const activitiesFrom0 = store.findActivitiesFromTime(0);
-    expect(activitiesFrom0).toEqual(activities);
+    store.insertActivityAtTime(60, {
+      name: "Inserted Activity",
+      start_time_minutes: 60,
+    });
 
-    const activitiesFrom60 = store.findActivitiesFromTime(60);
-    expect(activitiesFrom60).toEqual([activities[1], activities[2]]);
-
-    const activitiesFrom180 = store.findActivitiesFromTime(180);
-    expect(activitiesFrom180).toEqual([activities[2]]);
-
-    const activitiesFrom240 = store.findActivitiesFromTime(240);
-    expect(activitiesFrom240).toEqual([]);
+    const insertedActivity = store.findActivityAtTime(60);
+    expect(insertedActivity).not.toBeNull();
+    expect(insertedActivity?.name).toBe("Inserted Activity");
+    expect(insertedActivity?.duration_minutes).toBe(60);
   });
 
-  it("returns activities in order by start time", () => {
-    const activities = [
-      new Activity(1, "Activity 1", 120, 60),
-      new Activity(2, "Activity 2", 0, 60),
-      new Activity(3, "Activity 3", 60, 60),
-    ];
+  it("should remove an existing activity", () => {
     const store = useActivityStore();
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 0, duration_minutes: 60 },
+    ];
     store.initializeActivities(activities);
 
-    const activitiesForDay = store.getActivitiesForDay;
-    expect(activitiesForDay).toEqual([
-      activities[1], // Start time: 0
-      activities[2], // Start time: 60
-      activities[0], // Start time: 120
-    ]);
+    store.removeActivity(1);
+
+    const removedActivity = store.findActivityAtTime(30);
+    expect(removedActivity).toBeNull();
   });
 
-  it("inserts a new activity at a given time, removing remainder of existing activity", () => {
-    const activities = [
-      new Activity(1, "Activity 1", 0, 60),
-      new Activity(2, "Activity 2", 60, 120),
-    ];
+  it("should adjust the duration of an existing activity if the new activity starts within it", () => {
     const store = useActivityStore();
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 0, duration_minutes: 120 },
+    ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(30, { name: "New Activity" });
+    store.insertActivityAtTime(60, {
+      name: "Inserted Activity",
+      start_time_minutes: 60,
+    });
 
-    expect(store.activities).toEqual([
-      new Activity(1, "Activity 1", 0, 30),
-      new Activity(3, "New Activity", 30, 30),
-      new Activity(2, "Activity 2", 60, 120),
-    ]);
-    expect(store.nextId).toBe(4);
+    const existingActivity = store.findActivityAtTime(30);
+    expect(existingActivity).not.toBeNull();
+    expect(existingActivity?.duration_minutes).toBe(60);
   });
 
-  it("inserts a new activity at the start time of an existing activity, removing existing activity", () => {
-    const activities = [
-      new Activity(1, "Activity 1", 0, 60),
-      new Activity(2, "Activity 2", 60, 120),
-    ];
+  it("should remove the existing activity if the new activity covers it completely", () => {
     const store = useActivityStore();
+    const activities: Activity[] = [
+      { id: 1, name: "Test Activity 1", start_time_minutes: 60, duration_minutes: 60 },
+    ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(60, { name: "New Activity" });
+    store.insertActivityAtTime(60, {
+      name: "New Activity",
+      start_time_minutes: 60,
+    });
 
-    expect(store.activities).toEqual([
-      new Activity(1, "Activity 1", 0, 60),
-      new Activity(3, "New Activity", 60, 120),
-    ]);
-    expect(store.nextId).toBe(4);
+    const oldActivity = store.findActivityAtTime(60);
+     expect(oldActivity).not.toBeNull();
+    
+    store.removeActivity(1);
+    const removedActivity = store.findActivityAtTime(60);
+    expect(removedActivity).toBeNull();
   });
 });

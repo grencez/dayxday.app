@@ -54,9 +54,6 @@
    isMouseInTimeMarkers.ts
    updateActivityElementStyle.ts
   )
-  (model
-   Activity.ts
-  )
   (store
    activity.ts
   )

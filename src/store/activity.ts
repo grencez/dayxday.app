@@ -1,5 +1,11 @@
 import { defineStore } from "pinia";
-import { Activity } from "../model/Activity";
+
+export interface Activity {
+  id: number;
+  name: string;
+  start_time_minutes: number;
+  duration_minutes: number;
+}
 
 interface State {
   activities: Activity[];
@@ -15,9 +21,11 @@ export const useActivityStore = defineStore("activity", {
     getActivitiesForDay(state): Activity[] {
       return state.activities
         .filter(
-          (activity) => activity.startTime >= 0 && activity.startTime <= 1440,
+          (activity) =>
+            activity.start_time_minutes >= 0 &&
+            activity.start_time_minutes <= 1440,
         )
-        .sort((a, b) => a.startTime - b.startTime);
+        .sort((a, b) => a.start_time_minutes - b.start_time_minutes);
     },
     findActivityAtTime:
       (state) =>
@@ -25,8 +33,8 @@ export const useActivityStore = defineStore("activity", {
         return (
           state.activities.find(
             (activity) =>
-              time >= activity.startTime &&
-              time < activity.startTime + activity.duration,
+              time >= activity.start_time_minutes &&
+              time < activity.start_time_minutes + activity.duration_minutes,
           ) || null
         );
       },
@@ -34,8 +42,10 @@ export const useActivityStore = defineStore("activity", {
       (state) =>
       (time: number): Activity[] => {
         return state.activities
-          .filter((activity) => activity.startTime >= time)
-          .sort((a, b) => a.startTime - b.startTime);
+          .filter((activity) =>
+            activity.start_time_minutes + activity.duration_minutes > time
+          )
+          .sort((a, b) => a.start_time_minutes - b.start_time_minutes);
       },
   },
   actions: {
@@ -52,48 +62,38 @@ export const useActivityStore = defineStore("activity", {
         Object.assign(activity, updates);
       }
     },
+    removeActivity(id: number) {
+      this.activities = this.activities.filter((a) => a.id !== id);
+    },
     insertActivityAtTime(
       time: number,
-      newActivity: Omit<Activity, "id" | "duration">,
+      newActivity: Omit<Activity, "id" | "duration_minutes">,
     ) {
       const existingActivity = this.findActivityAtTime(time);
       const nextActivities = this.findActivitiesFromTime(time);
 
       let newDuration: number;
-      if (existingActivity && existingActivity.startTime === time) {
-        // Remove the existing activity if the new activity starts at the same time
-        newDuration = existingActivity.duration;
-        this.activities = this.activities.filter(
-          (a) => a.id !== existingActivity.id,
-        );
+      if (nextActivities.length > 0) {
+        newDuration = nextActivities[0].start_time_minutes - time;
       } else {
-        if (nextActivities.length > 0) {
-          newDuration = nextActivities[0].startTime - time;
-        } else {
-          newDuration = 1440 - time; // Assuming 1440 as the end of the day
-        }
+        newDuration = 1440 - time; // Assuming 1440 as the end of the day
+      }
 
-        if (existingActivity) {
-          const newExistingDuration = time - existingActivity.startTime;
-          if (newExistingDuration > 0) {
-            existingActivity.duration = newExistingDuration;
-          } else {
-            // Remove the existing activity if the new duration is not positive
-            this.activities = this.activities.filter(
-              (a) => a.id !== existingActivity.id,
-            );
-          }
+      if (existingActivity) {
+        const newExistingDuration = time - existingActivity.start_time_minutes;
+        if (newExistingDuration > 0) {
+          existingActivity.duration_minutes = newExistingDuration;
         }
       }
 
       const fullNewActivity: Activity = {
         ...newActivity,
         id: this.nextId++,
-        startTime: time,
-        duration: newDuration,
+        start_time_minutes: time,
+        duration_minutes: newDuration,
       };
       this.activities.push(fullNewActivity);
-      this.activities.sort((a, b) => a.startTime - b.startTime);
+      this.activities.sort((a, b) => a.start_time_minutes - b.start_time_minutes);
     },
   },
 });

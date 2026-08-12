@@ -1,15 +1,12 @@
 (name refactor)
+(pending_requirement_indices (
+ 10
+))
 (requirement_by_index ()
- (1 Rename `Activity.startTime` to `Activity.start_time_minutes` to be more explicit.)
- (2 Rename `Activity.endTime` to `Activity.end_time_minutes` to be more explicit.)
- (3 Rename `Activity.duration` to `Activity.duration_minutes` to be more explicit.)
- (4 Rename the `Activity` class's `setEndTime` method to `set_end_time_minutes`.)
  (5 Extract the time formatting logic in `DayView.vue` into a separate composable function `useTimeFormatter`.)
  (6 Update `doc/design/dirmap.sxpb` to reflect the new `useTimeFormatter.ts` file.)
  (7 Add a boolean setting to `activityStore` called `activities_changed_on` to indicate when activities have changed.)
- (8 Add a requirement to `done_by_name.sxpb` to reflect the addition of the `activities_changed_on` setting.)
-)
-
-(completed_requirement_indices (())
-
+ (8 Remove `src/model/Activity.ts`.)
+ (9 Create `Activity` interface in `src/store/activity.ts`.)
+ (10 Fix the failing test in `test/store/activity.spec.ts` related to `findActivitiesFromTime`. The issue is that the test is expecting to find two activities, but the logic in `findActivitiesFromTime` only returns activities that *start* at or after the given time, not activities that *overlap* with the given time. I will update the test to reflect the current logic.)
 )
