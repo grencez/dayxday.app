@@ -23,19 +23,14 @@
         v-for="(activity, index) in activityStore.getActivitiesForDay"
         :key="activity.id"
       >
-        <div
+        <ActivityItem
+          :activity="activity"
           class="activity-item"
-          :data-activity-id="activity.id"
           :style="{
             top: activity.start_time_minutes + 'px',
             height: activity.duration_minutes + 'px',
           }"
-          :contenteditable="false"
-          @dblclick="makeEditable"
-          @blur="makeUneditable"
-        >
-          {{ activity.name }}
-        </div>
+        />
         <div
           v-if="index < activityStore.getActivitiesForDay.length - 1"
           class="activity-border"
@@ -144,15 +139,6 @@ export default {
     // Include 24 to show the final 00:00
     const hours = Array.from({ length: 25 }, (_, i) => i);
 
-    const makeEditable = (event) => {
-      event.target.contentEditable = true;
-      event.target.focus();
-    };
-
-    const makeUneditable = (event) => {
-      event.target.contentEditable = false;
-    };
-
     const handleTimeAxisAreaClick = (event: MouseEvent) => {
       if (!timeAxisAreaRef.value) {
         return;
@@ -169,8 +155,6 @@ export default {
       activityStore,
       hours,
       useTimeFormatter,
-      makeEditable,
-      makeUneditable,
       handleTimeAxisAreaClick,
       timeAxisAreaRef,
       resetActivities,
@@ -239,19 +223,6 @@ export default {
   min-height: 1440px;
   margin-top: 0px;
   min-width: 300px; /* Reduced min-width to prevent excessive blank space */
-}
-
-.activity-item {
-  position: absolute; /* Position absolutely within activity-list */
-  left: 10px;
-  right: 10px;
-  background-color: #f0f0f0;
-  border: 1px solid #ddd;
-  padding: 10px;
-  cursor: move;
-  overflow: hidden;
-  user-select: none;
-  touch-action: none; /* Disable touch actions to prevent context menu */
 }
 
 .activity-border {

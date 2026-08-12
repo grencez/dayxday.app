@@ -13,7 +13,6 @@ DayXDay.app is a single-page application (SPA) built using Vue.js. It follows a 
 ## Composables
 
 - **useDragAndDrop.mts:** Handles drag-and-drop interactions for resizing and reordering activities.
-- **useActivityDatabase.mts:** (To be removed) Previously handled data persistence with IndexedDB, now replaced by Pinia.
 
 ## Store
 
