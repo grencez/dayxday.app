@@ -7,6 +7,7 @@
         :key="hour"
         class="time-marker"
         :style="{ top: hour * 60 + 'px' }"
+        @click="handleTimeMarkerClick(hour)"
       >
         <span class="time-text">{{ useTimeFormatter(hour).formattedTime }}</span>
         <span class="tick-mark"></span>
@@ -80,12 +81,20 @@ export default {
       event.target.contentEditable = false;
     };
 
+    const handleTimeMarkerClick = (hour: number) => {
+      const timeInMinutes = hour * 60;
+      activityStore.insertActivityAtTime(timeInMinutes, {
+        name: "New Activity",
+      });
+    };
+
     return {
       activityStore,
       hours,
       useTimeFormatter,
       makeEditable,
       makeUneditable,
+      handleTimeMarkerClick,
     };
   },
 };
@@ -116,6 +125,7 @@ export default {
   display: flex;
   align-items: center;
   height: 1px;
+  cursor: pointer; /* Add cursor pointer to indicate clickability */
 }
 
 .time-text {

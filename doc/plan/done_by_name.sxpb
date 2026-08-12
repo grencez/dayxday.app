@@ -23,3 +23,10 @@
  )
  (completed_requirement_indices (())
 )
+)
+(remove_activity
+ (description Add a removeActivity action to the store.)
+)
+(fix_find_activities_from_time
+ (description Fix the failing test in `test/store/activity.spec.ts` related to `findActivitiesFromTime`. The issue is that the test is expecting to find two activities, but the logic in `findActivitiesFromTime` only returns activities that *start* at or after the given time, not activities that *overlap* with the given time. I will update the test to reflect the current logic.)
+)

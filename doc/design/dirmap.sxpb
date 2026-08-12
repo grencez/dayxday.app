@@ -27,6 +27,7 @@
   (uat
    activity_resize.md
    activity_squish.md
+   activity_create.md
   )
  )
  (src  ; Source code.

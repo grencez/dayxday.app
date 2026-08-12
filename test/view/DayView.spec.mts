@@ -49,4 +49,23 @@ describe("DayView.vue", () => {
     const activityItems = wrapper.findAll(".activity-item");
     expect(activityItems.length).toBe(10);
   });
+
+  it("should create a new activity when a time marker is clicked", async () => {
+    const wrapper = mount(DayView);
+    const activityStore = useActivityStore();
+    const timeMarkers = wrapper.findAll(".time-marker");
+
+    // Simulate a click on the 3rd time marker (hour 2)
+    await timeMarkers[2].trigger("click");
+
+    // Check that a new activity has been created
+    expect(activityStore.getActivitiesForDay.length).toBe(11);
+
+    // Check that the new activity has the correct start time and default name
+    const newActivity = activityStore.getActivitiesForDay.find(
+      (activity) => activity.name === "New Activity",
+    );
+    expect(newActivity).toBeDefined();
+    expect(newActivity?.start_time_minutes).toBe(2 * 60);
+  });
 });
