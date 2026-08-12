@@ -80,23 +80,30 @@ describe("useDragAndDrop", () => {
 
     vi.spyOn(document, "querySelectorAll").mockImplementation((selector) => {
       if (selector === ".activity-item") {
-        return [mockElementA, mockElementB, {
-          style: { top: "", height: "" },
-          addEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-          getBoundingClientRect: () => ({
-            top: 300,
-          }),
-        }];
+        return [
+          mockElementA,
+          mockElementB,
+          {
+            style: { top: "", height: "" },
+            addEventListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+            getBoundingClientRect: () => ({
+              top: 300,
+            }),
+          },
+        ];
       } else if (selector === ".activity-border") {
-        return [mockBorder, {
-          style: { top: "" },
-          addEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-          getBoundingClientRect: () => ({
-            top: 300,
-          }),
-        }];
+        return [
+          mockBorder,
+          {
+            style: { top: "" },
+            addEventListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+            getBoundingClientRect: () => ({
+              top: 300,
+            }),
+          },
+        ];
       }
       return [];
     });
@@ -177,7 +184,8 @@ describe("useDragAndDrop", () => {
     // Calculate what the snapped end time should have been
     const nearestHour = Math.round(180 / 60); // 60 is the height of an hour
     const expectedSnappedEndTime = nearestHour * 60;
-    const expectedSnappedDuration = expectedSnappedEndTime - wrapper.vm.activities[0].startTime;
+    const expectedSnappedDuration =
+      expectedSnappedEndTime - wrapper.vm.activities[0].startTime;
 
     expect(newDuration).toBe(expectedSnappedDuration);
   });

@@ -1,9 +1,15 @@
 import { defineStore } from "pinia";
 import { Activity } from "../model/Activity";
 
-export const useActivityStore = defineStore("activities", {
-  state: () => ({
-    activities: [] as Activity[],
+interface State {
+  activities: Activity[];
+  nextId: number;
+}
+
+export const useActivityStore = defineStore("activity", {
+  state: (): State => ({
+    activities: [],
+    nextId: 1,
   }),
   getters: {
     getActivitiesForDay(state): Activity[] {
@@ -13,21 +19,71 @@ export const useActivityStore = defineStore("activities", {
         )
         .sort((a, b) => a.startTime - b.startTime);
     },
+    findActivityAtTime: (state) => (time: number): Activity | null => {
+      return (
+        state.activities.find(
+          (activity) =>
+            time >= activity.startTime && time < activity.startTime + activity.duration,
+        ) || null
+      );
+    },
+    findActivitiesFromTime: (state) => (time: number): Activity[] => {
+      return state.activities.filter((activity) => activity.startTime >= time).sort((a,b) => a.startTime - b.startTime);
+    }
   },
   actions: {
-    async initializeActivities(initialActivities?: Activity[]) {
-      if (initialActivities) {
-        this.activities = initialActivities;
-      } else {
-        // Potentially initialize with an empty array or default values
-        this.activities = [];
+    initializeActivities(activities: Activity[]) {
+      this.activities = activities;
+      this.nextId = this.activities.length > 0
+        ? Math.max(...this.activities.map((a) => a.id)) + 1
+        : 1;
+    },
+    updateActivity(id: number, updates: Partial<Activity>) {
+      const activity = this.activities.find((a) => a.id === id);
+      if (activity) {
+        Object.assign(activity, updates);
       }
     },
-    async updateActivity(id: number, updates: Partial<Activity>) {
-      const index = this.activities.findIndex((activity) => activity.id === id);
-      if (index !== -1) {
-        Object.assign(this.activities[index], updates);
+    insertActivityAtTime(time: number, newActivity: Omit<Activity, "id" | "duration">) {
+      const existingActivity = this.findActivityAtTime(time);
+      const nextActivities = this.findActivitiesFromTime(time);
+
+      let newDuration: number;
+      if (existingActivity && existingActivity.startTime === time) {
+          // Remove the existing activity if the new activity starts at the same time
+          newDuration = existingActivity.duration;
+          this.activities = this.activities.filter(
+            (a) => a.id !== existingActivity.id,
+          );
+          
+      } else {
+        if (nextActivities.length > 0) {
+          newDuration = nextActivities[0].startTime - time;
+        } else {
+          newDuration = 1440 - time; // Assuming 1440 as the end of the day
+        }
+
+        if (existingActivity) {
+          const newExistingDuration = time - existingActivity.startTime;
+          if (newExistingDuration > 0) {
+            existingActivity.duration = newExistingDuration;
+          } else {
+            // Remove the existing activity if the new duration is not positive
+            this.activities = this.activities.filter(
+              (a) => a.id !== existingActivity.id,
+            );
+          }
+        }
       }
+      
+      const fullNewActivity: Activity = {
+        ...newActivity,
+        id: this.nextId++,
+        startTime: time,
+        duration: newDuration,
+      };
+      this.activities.push(fullNewActivity);
+      this.activities.sort((a, b) => a.startTime - b.startTime);
     },
   },
 });

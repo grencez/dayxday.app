@@ -42,7 +42,7 @@ export default defineConfig({
   ],
   test: {
     environment: "jsdom",
-    include: ["../test/**/*.spec.mts"],
+    include: ["../test/**/*.spec.{mts,ts}"],
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },

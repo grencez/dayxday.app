@@ -65,7 +65,8 @@ export function useDragAndDrop() {
     ] as HTMLElement;
     initialDuration =
       activityStore.getActivitiesForDay[draggedBorderIndex].duration;
-    initialStartTime = initialDuration +
+    initialStartTime =
+      initialDuration +
       activityStore.getActivitiesForDay[draggedBorderIndex].startTime;
 
     border_orig_screen_y = borderElement.getBoundingClientRect().top;
@@ -85,7 +86,10 @@ export function useDragAndDrop() {
     isResizingBorder = false;
 
     const timeMarkers = document.querySelector(".time-markers");
-    border_orig_screen_y = timeMarkers?.getBoundingClientRect().top + initialStartTime + initialDuration;
+    border_orig_screen_y =
+      timeMarkers?.getBoundingClientRect().top +
+      initialStartTime +
+      initialDuration;
   };
 
   /**
@@ -104,7 +108,10 @@ export function useDragAndDrop() {
 
     let border_curr_screen_y = border_orig_screen_y;
     if (timeMarkersRect && isMouseInTimeMarkers(e, timeMarkersRect)) {
-      border_curr_screen_y = calculateSnappedY(mouse_curr_screen_y, timeMarkersRect);
+      border_curr_screen_y = calculateSnappedY(
+        mouse_curr_screen_y,
+        timeMarkersRect,
+      );
     } else {
       border_curr_screen_y += mouse_curr_screen_y - mouse_orig_screen_y;
     }
@@ -172,10 +179,7 @@ export function useDragAndDrop() {
   /**
    * Handles the resizing of an activity.
    */
-  function handleActivityResize(
-    diffY: number,
-    draggedActivityIndex: number,
-  ) {
+  function handleActivityResize(diffY: number, draggedActivityIndex: number) {
     const currentActivity =
       activityStore.getActivitiesForDay[draggedActivityIndex];
     let newDuration = initialDuration + diffY;
