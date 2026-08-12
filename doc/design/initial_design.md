@@ -42,6 +42,5 @@ DayXDay.app is a mobile-friendly day planner application designed to help users 
 
 ## Future Considerations
 
-- **User Accounts:** Implementing user accounts to allow data synchronization across devices.
 - **Calendar Integration:** Integrating with external calendar services.
 - **Collaboration:** Allowing users to share schedules and collaborate on activities.
