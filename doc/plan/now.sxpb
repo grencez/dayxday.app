@@ -1,0 +1,15 @@
+(name refactor)
+(requirement_by_index ()
+ (1 Rename `Activity.startTime` to `Activity.start_time_minutes` to be more explicit.)
+ (2 Rename `Activity.endTime` to `Activity.end_time_minutes` to be more explicit.)
+ (3 Rename `Activity.duration` to `Activity.duration_minutes` to be more explicit.)
+ (4 Rename the `Activity` class's `setEndTime` method to `set_end_time_minutes`.)
+ (5 Extract the time formatting logic in `DayView.vue` into a separate composable function `useTimeFormatter`.)
+ (6 Update `doc/design/dirmap.sxpb` to reflect the new `useTimeFormatter.ts` file.)
+ (7 Add a boolean setting to `activityStore` called `activities_changed_on` to indicate when activities have changed.)
+ (8 Add a requirement to `done_by_name.sxpb` to reflect the addition of the `activities_changed_on` setting.)
+)
+
+(completed_requirement_indices (())
+
+)

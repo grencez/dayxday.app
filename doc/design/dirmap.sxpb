@@ -8,13 +8,25 @@
  vite.config.mts  ; Vite configuration file.
  (doc  ; Documentation
   (design  ; Design documents
-   active.md
    architecture.md
    dirmap.sxpb  ; Directory structure of codebase. This file.
    initial_design.md  ; Initial design document
    (decision
     pinia.md
    )
+  )
+  (plan
+   done_by_name.sxpb
+   now.sxpb
+   todo_by_name.sxpb
+  )
+  (styleguide
+   filepath_style.md
+   variable_style.md
+  )
+  (uat
+   activity_resize.md
+   activity_squish.md
   )
  )
  (src  ; Source code.
@@ -23,34 +35,47 @@
   main.mts  ; Entry point for the Vue app
   router.mts  ; Vue Router configuration
   (asset  ; Static assets (images, fonts, etc.)
-   logo.png
-   (component  ; Reusable Vue components.
-    Activity.vue
-    DayView.vue
-   )
-   (composable  ; Reusable Vue composition functions.
-    useDragAndDrop.mts
-   )
-   (function
-    calculateSnappedY.ts
-    isMouseInTimeMarkers.ts
-    updateActivityElementStyle.ts
-   )
-   (store
-    activityStore.ts
+   (image
+    logo.png
    )
    (style  ; Global styles.
     main.css
    )
   )
+  (component  ; Reusable Vue components.
+   ActivityItem.vue
+  )
+  (composable  ; Reusable Vue composition functions.
+   useDragAndDrop.mts
+   useTimeFormatter.ts
+  )
+  (function
+   calculateSnappedY.ts
+   isMouseInTimeMarkers.ts
+   updateActivityElementStyle.ts
+  )
+  (model
+   Activity.ts
+  )
+  (store
+   activity.ts
+  )
+  (view
+   DayView.vue
+  )
  )
  (test  ; Unit and integration tests.
   (component
-   Activity.spec.mts
-   DayView.spec.mts
+   ActivityItem.spec.mts
   )
   (composable
    useDragAndDrop.spec.mts
+  )
+  (store
+   activity.spec.mts
+  )
+  (view
+   DayView.spec.mts
   )
  )
  (node_modules)  ; Node.js dependencies (ignored by git).

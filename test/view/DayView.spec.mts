@@ -1,10 +1,10 @@
 import { mount } from "@vue/test-utils";
-import DayView from "@/asset/component/DayView.vue";
+import DayView from "@/view/DayView.vue";
 import { describe, it, expect, beforeEach } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { createPinia, setActivePinia } from "pinia";
-import { useActivityStore } from "../../src/asset/store/activityStore";
-import { Activity } from "../../src/asset/model/Activity";
+import { useActivityStore } from "@/store/activity";
+import { Activity } from "@/model/Activity";
 
 describe("DayView.vue", () => {
   beforeEach(async () => {

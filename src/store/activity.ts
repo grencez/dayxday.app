@@ -19,24 +19,32 @@ export const useActivityStore = defineStore("activity", {
         )
         .sort((a, b) => a.startTime - b.startTime);
     },
-    findActivityAtTime: (state) => (time: number): Activity | null => {
-      return (
-        state.activities.find(
-          (activity) =>
-            time >= activity.startTime && time < activity.startTime + activity.duration,
-        ) || null
-      );
-    },
-    findActivitiesFromTime: (state) => (time: number): Activity[] => {
-      return state.activities.filter((activity) => activity.startTime >= time).sort((a,b) => a.startTime - b.startTime);
-    }
+    findActivityAtTime:
+      (state) =>
+      (time: number): Activity | null => {
+        return (
+          state.activities.find(
+            (activity) =>
+              time >= activity.startTime &&
+              time < activity.startTime + activity.duration,
+          ) || null
+        );
+      },
+    findActivitiesFromTime:
+      (state) =>
+      (time: number): Activity[] => {
+        return state.activities
+          .filter((activity) => activity.startTime >= time)
+          .sort((a, b) => a.startTime - b.startTime);
+      },
   },
   actions: {
     initializeActivities(activities: Activity[]) {
       this.activities = activities;
-      this.nextId = this.activities.length > 0
-        ? Math.max(...this.activities.map((a) => a.id)) + 1
-        : 1;
+      this.nextId =
+        this.activities.length > 0
+          ? Math.max(...this.activities.map((a) => a.id)) + 1
+          : 1;
     },
     updateActivity(id: number, updates: Partial<Activity>) {
       const activity = this.activities.find((a) => a.id === id);
@@ -44,18 +52,20 @@ export const useActivityStore = defineStore("activity", {
         Object.assign(activity, updates);
       }
     },
-    insertActivityAtTime(time: number, newActivity: Omit<Activity, "id" | "duration">) {
+    insertActivityAtTime(
+      time: number,
+      newActivity: Omit<Activity, "id" | "duration">,
+    ) {
       const existingActivity = this.findActivityAtTime(time);
       const nextActivities = this.findActivitiesFromTime(time);
 
       let newDuration: number;
       if (existingActivity && existingActivity.startTime === time) {
-          // Remove the existing activity if the new activity starts at the same time
-          newDuration = existingActivity.duration;
-          this.activities = this.activities.filter(
-            (a) => a.id !== existingActivity.id,
-          );
-          
+        // Remove the existing activity if the new activity starts at the same time
+        newDuration = existingActivity.duration;
+        this.activities = this.activities.filter(
+          (a) => a.id !== existingActivity.id,
+        );
       } else {
         if (nextActivities.length > 0) {
           newDuration = nextActivities[0].startTime - time;
@@ -75,7 +85,7 @@ export const useActivityStore = defineStore("activity", {
           }
         }
       }
-      
+
       const fullNewActivity: Activity = {
         ...newActivity,
         id: this.nextId++,

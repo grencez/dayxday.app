@@ -1,19 +1,19 @@
-import { useDragAndDrop } from "@/asset/composable/useDragAndDrop";
+import { useDragAndDrop } from "@/composable/useDragAndDrop";
 import { ref, defineComponent, nextTick } from "vue";
-import { mount } from "@vue/test-utils";
+import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
-import { Activity } from "../../src/asset/model/Activity";
+import { Activity } from "@/model/Activity";
 import { createPinia, setActivePinia } from "pinia";
-import { useActivityStore } from "../../src/asset/store/activityStore";
+import { useActivityStore } from "@/store/activity";
 
 describe("useDragAndDrop", () => {
-  let activities = ref(null);
-  let mockElementA: any;
-  let mockElementB: any;
-  let mockBorder: any;
-  let mockTimeMarkers: any;
-  let wrapper: any;
+  const activities = ref<Activity[] | null>(null);
+  let mockElementA: HTMLElement;
+  let mockElementB: HTMLElement;
+  let mockBorder: HTMLElement;
+  let mockTimeMarkers: HTMLElement;
+  let wrapper: VueWrapper;
   let startDrag: (
     e: MouseEvent | TouchEvent,
     item: Element,
@@ -38,45 +38,38 @@ describe("useDragAndDrop", () => {
     ];
     activityStore.initializeActivities(activities.value);
 
-    mockElementA = {
-      style: {
-        top: "",
-        height: "",
-      },
-      addEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-      getBoundingClientRect: () => ({
-        top: 100,
-      }),
-    };
-    mockElementB = {
-      style: {
-        top: "",
-        height: "",
-      },
-      addEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-      getBoundingClientRect: () => ({
-        top: 200,
-      }),
-    };
-    mockBorder = {
-      style: {
-        top: "",
-      },
-      getBoundingClientRect: () => ({
-        top: 200,
-      }),
-      addEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    };
-    mockTimeMarkers = {
-      getBoundingClientRect: () => ({
-        left: 0,
-        right: 100,
-        top: 0,
-      }),
-    };
+    mockElementA = document.createElement("div");
+    mockElementA.style.top = "100px";
+    mockElementA.style.height = "100px";
+    mockElementA.addEventListener = vi.fn();
+    mockElementA.dispatchEvent = vi.fn();
+    mockElementA.getBoundingClientRect = vi.fn(() => ({
+      top: 100,
+    }));
+
+    mockElementB = document.createElement("div");
+    mockElementB.style.top = "200px";
+    mockElementB.style.height = "100px";
+    mockElementB.addEventListener = vi.fn();
+    mockElementB.dispatchEvent = vi.fn();
+    mockElementB.getBoundingClientRect = vi.fn(() => ({
+      top: 200,
+    }));
+
+    mockBorder = document.createElement("div");
+    mockBorder.style.top = "200px";
+    mockBorder.addEventListener = vi.fn();
+    mockBorder.dispatchEvent = vi.fn();
+    mockBorder.getBoundingClientRect = vi.fn(() => ({
+      top: 200,
+    }));
+
+    mockTimeMarkers = document.createElement("div");
+    mockTimeMarkers.getBoundingClientRect = vi.fn(() => ({
+      left: 0,
+      right: 100,
+      top: 0,
+    }));
 
     vi.spyOn(document, "querySelectorAll").mockImplementation((selector) => {
       if (selector === ".activity-item") {
@@ -145,9 +138,6 @@ describe("useDragAndDrop", () => {
       // Simulate mousemove to resize the border
       const mousemoveEvent = new MouseEvent("mousemove", { clientY: 200 });
       moveDrag(mousemoveEvent);
-
-      // Simulate mouseup to end the drag
-      const mouseupEvent = new MouseEvent("mouseup");
       endDrag();
 
       // Assert that start time of A and end time of B have not changed
@@ -161,8 +151,6 @@ describe("useDragAndDrop", () => {
   it("should snap to the nearest hour marker when resizing and mouse is in time markers area", async () => {
     await nextTick(); // Wait for onMounted to run
 
-    const initialDuration = wrapper.vm.activities[0].duration;
-
     // Simulate mousedown on the first activity to start resizing
     const mousedownEvent = new MouseEvent("mousedown", { clientY: 150 });
     startDrag(mousedownEvent, mockElementA, 0, false);
@@ -173,9 +161,6 @@ describe("useDragAndDrop", () => {
       clientX: 50, // Within the time markers area (left: 0, right: 100)
     });
     moveDrag(mousemoveEvent);
-
-    // Simulate mouseup to end the resize
-    const mouseupEvent = new MouseEvent("mouseup");
     endDrag();
 
     // Assert that the activity's end time snaped to the nearest hour marker
@@ -205,9 +190,6 @@ describe("useDragAndDrop", () => {
       clientX: 150, // Outside the time markers area (left: 0, right: 100)
     });
     moveDrag(mousemoveEvent);
-
-    // Simulate mouseup to end the resize
-    const mouseupEvent = new MouseEvent("mouseup");
     endDrag();
 
     // Assert that the activity's duration changed proportionally to the mouse movement

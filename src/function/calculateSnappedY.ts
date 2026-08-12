@@ -1,5 +1,3 @@
-import { Ref } from "vue";
-
 export function calculateSnappedY(
   clientY: number,
   timeMarkersRect: DOMRect,

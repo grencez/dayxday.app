@@ -1,8 +1,8 @@
 import { mount } from "@vue/test-utils";
-import Activity from "@/asset/component/Activity.vue";
+import ActivityItem from "@/component/ActivityItem.vue";
 import { describe, it, expect } from "vitest";
 
-describe("Activity.vue", () => {
+describe("ActivityItem.vue", () => {
   it("renders the activity name", () => {
     const activity = {
       id: 1,
@@ -10,7 +10,7 @@ describe("Activity.vue", () => {
       startTime: 0,
       duration: 60,
     };
-    const wrapper = mount(Activity, {
+    const wrapper = mount(ActivityItem, {
       props: {
         activity: activity,
       },
@@ -25,7 +25,7 @@ describe("Activity.vue", () => {
       startTime: 100,
       duration: 120,
     };
-    const wrapper = mount(Activity, {
+    const wrapper = mount(ActivityItem, {
       props: {
         activity: activity,
       },

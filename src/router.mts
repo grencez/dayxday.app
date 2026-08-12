@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import DayView from "./asset/component/DayView.vue";
+import DayView from "./view/DayView.vue";
 
 const routes = [
   {

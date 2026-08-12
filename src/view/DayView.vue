@@ -8,7 +8,7 @@
         class="time-marker"
         :style="{ top: hour * 60 + 'px' }"
       >
-        <span class="time-text">{{ formatTime(hour) }}</span>
+        <span class="time-text">{{ useTimeFormatter(hour).formattedTime }}</span>
         <span class="tick-mark"></span>
       </div>
     </div>
@@ -38,15 +38,16 @@
 
 <script lang="ts">
 import { useDragAndDrop } from "../composable/useDragAndDrop";
-import { useActivityStore } from "../store/activityStore";
+import { useActivityStore } from "../store/activity";
 import { onMounted } from "vue";
-import Activity from "./Activity.vue";
+import ActivityItem from "../component/ActivityItem.vue";
 import { Activity as ActivityModel } from "../model/Activity";
+import { useTimeFormatter } from "../composable/useTimeFormatter";
 
 export default {
   name: "DayView",
   components: {
-    Activity,
+    ActivityItem,
   },
   setup() {
     const activityStore = useActivityStore();
@@ -71,10 +72,6 @@ export default {
     // Include 24 to show the final 00:00
     const hours = Array.from({ length: 25 }, (_, i) => i);
 
-    const formatTime = (hour) => {
-      return String(hour % 24).padStart(2, "0") + ":00";
-    };
-
     const makeEditable = (event) => {
       event.target.contentEditable = true;
       event.target.focus();
@@ -87,7 +84,7 @@ export default {
     return {
       activityStore,
       hours,
-      formatTime,
+      useTimeFormatter,
       makeEditable,
       makeUneditable,
     };

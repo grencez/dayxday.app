@@ -1,6 +1,6 @@
 import { setActivePinia, createPinia } from "pinia";
-import { useActivityStore } from "@/asset/store/activityStore";
-import { Activity } from "@/asset/model/Activity";
+import { useActivityStore } from "@/store/activity";
+import { Activity } from "@/model/Activity";
 import { describe, it, expect, beforeEach } from "vitest";
 
 describe("ActivityStore", () => {
@@ -21,7 +21,7 @@ describe("ActivityStore", () => {
     const store = useActivityStore();
     store.initializeActivities(initialActivities);
     expect(store.activities).toEqual(initialActivities);
-    expect(store.nextId).toBe(3)
+    expect(store.nextId).toBe(3);
   });
 
   it("gets activities for the day", () => {
@@ -134,17 +134,17 @@ describe("ActivityStore", () => {
     ];
     const store = useActivityStore();
     store.initializeActivities(activities);
-  
+
     store.insertActivityAtTime(30, { name: "New Activity" });
-  
+
     expect(store.activities).toEqual([
       new Activity(1, "Activity 1", 0, 30),
       new Activity(3, "New Activity", 30, 30),
       new Activity(2, "Activity 2", 60, 120),
     ]);
-    expect(store.nextId).toBe(4)
+    expect(store.nextId).toBe(4);
   });
-  
+
   it("inserts a new activity at the start time of an existing activity, removing existing activity", () => {
     const activities = [
       new Activity(1, "Activity 1", 0, 60),
@@ -152,13 +152,13 @@ describe("ActivityStore", () => {
     ];
     const store = useActivityStore();
     store.initializeActivities(activities);
-  
+
     store.insertActivityAtTime(60, { name: "New Activity" });
-  
+
     expect(store.activities).toEqual([
       new Activity(1, "Activity 1", 0, 60),
       new Activity(3, "New Activity", 60, 120),
     ]);
-    expect(store.nextId).toBe(4)
+    expect(store.nextId).toBe(4);
   });
 });

@@ -1,0 +1,7 @@
+()
+(reset_ui
+ (description Make a button that resets the UI with a default schedule.)
+)
+(database
+ (description Connect the UI with a local database managed by Pinia.)
+)

@@ -1,5 +1,5 @@
 import { onMounted, onUnmounted, ref, nextTick } from "vue";
-import { useActivityStore } from "../store/activityStore";
+import { useActivityStore } from "../store/activity";
 import { calculateSnappedY } from "../function/calculateSnappedY";
 import { isMouseInTimeMarkers } from "../function/isMouseInTimeMarkers";
 import { updateActivityElementStyle } from "../function/updateActivityElementStyle";
@@ -98,7 +98,7 @@ export function useDragAndDrop() {
   const moveDrag = (e: MouseEvent | TouchEvent) => {
     if (!draggedItem || !isDragging.value) return;
 
-    let mouse_curr_screen_y =
+    const mouse_curr_screen_y =
       (e as MouseEvent).clientY ||
       ((e as TouchEvent).touches && (e as TouchEvent).touches[0].clientY);
     if (mouse_curr_screen_y === undefined) return;
@@ -120,7 +120,7 @@ export function useDragAndDrop() {
       const diffY = border_curr_screen_y - border_orig_screen_y;
       handleActivityResize(diffY, draggedActivityIndex);
     } else if (isResizingBorder && draggedBorderIndex !== null) {
-      handleBorderDrag(border_curr_screen_y, draggedBorderIndex, e);
+      handleBorderDrag(border_curr_screen_y, draggedBorderIndex);
     }
   };
 
@@ -182,7 +182,7 @@ export function useDragAndDrop() {
   function handleActivityResize(diffY: number, draggedActivityIndex: number) {
     const currentActivity =
       activityStore.getActivitiesForDay[draggedActivityIndex];
-    let newDuration = initialDuration + diffY;
+    const newDuration = initialDuration + diffY;
 
     if (newDuration > 0) {
       activityStore.updateActivity(currentActivity.id, {
@@ -213,7 +213,6 @@ export function useDragAndDrop() {
   function handleBorderDrag(
     border_curr_screen_y: number,
     draggedBorderIndex: number,
-    e: MouseEvent | TouchEvent,
   ) {
     if (
       draggedBorderIndex < 0 ||
