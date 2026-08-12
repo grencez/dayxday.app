@@ -20,7 +20,7 @@
     </div>
     <div class="activity-list">
       <template
-        v-for="(activity, index) in activityStore.getActivitiesForDay"
+        v-for="(activity, index) in activities"
         :key="activity.id"
       >
         <ActivityItem
@@ -32,7 +32,7 @@
           }"
         />
         <div
-          v-if="index < activityStore.getActivitiesForDay.length - 1"
+          v-if="index < activities.length - 1"
           class="activity-border"
           :data-border-index="index"
           :style="{
@@ -51,7 +51,7 @@
 <script lang="ts">
 import { useDragAndDrop } from "../composable/useDragAndDrop";
 import { useActivityStore, Activity } from "../store/activity";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import ActivityItem from "../component/ActivityItem.vue";
 import { useTimeFormatter } from "../composable/useTimeFormatter";
 
@@ -62,7 +62,13 @@ export default {
   },
   setup() {
     const activityStore = useActivityStore();
-    useDragAndDrop();
+    // Use today's date for now, matching the test default
+    // In a real app, this would be reactive based on selected date
+    const currentDate = ref(new Date().toISOString().split("T")[0]);
+
+    useDragAndDrop(currentDate.value);
+
+    const activities = computed(() => activityStore.getActivitiesForDay(currentDate.value));
 
     const timeAxisAreaRef = ref<HTMLElement | null>(null);
 
@@ -73,66 +79,82 @@ export default {
           name: "Morning Routine",
           start_time_minutes: 0,
           duration_minutes: 100,
+          date: currentDate.value,
         },
         {
           id: 2,
           name: "Work Session",
           start_time_minutes: 100,
           duration_minutes: 200,
+          date: currentDate.value,
         },
         {
           id: 3,
           name: "Lunch Break",
           start_time_minutes: 300,
           duration_minutes: 80,
+          date: currentDate.value,
         },
         {
           id: 4,
           name: "Afternoon Tasks",
           start_time_minutes: 380,
           duration_minutes: 150,
+          date: currentDate.value,
         },
         {
           id: 5,
           name: "Evening Tasks",
           start_time_minutes: 530,
           duration_minutes: 100,
+          date: currentDate.value,
         },
         {
           id: 6,
           name: "Dinner",
           start_time_minutes: 630,
           duration_minutes: 60,
+          date: currentDate.value,
         },
         {
           id: 7,
           name: "Relax",
           start_time_minutes: 690,
           duration_minutes: 120,
+          date: currentDate.value,
         },
         {
           id: 8,
           name: "Bedtime Routine",
           start_time_minutes: 810,
           duration_minutes: 60,
+          date: currentDate.value,
         },
         {
           id: 9,
           name: "Sleep",
           start_time_minutes: 870,
           duration_minutes: 570,
+          date: currentDate.value,
         },
         {
           id: 10,
           name: "Wake Up",
           start_time_minutes: 1440,
           duration_minutes: 0,
+          date: currentDate.value,
         },
       ];
       activityStore.initializeActivities(initialActivities);
     };
 
     const clearActivities = () => {
+      // Should probably clear all activities or just for the day?
+      // Since initializeActivities replaces everything in the store,
+      // if we had multiple days, this would be bad.
+      // But for now, let's keep it simple as we haven't implemented multi-day filtering in initialization.
+      // But wait, the store only supports initializing the WHOLE list.
+      // So clearActivities effectively clears EVERYTHING.
       activityStore.initializeActivities([]);
     };
 
@@ -146,13 +168,14 @@ export default {
       const rect = timeAxisAreaRef.value.getBoundingClientRect();
       const y = event.clientY - rect.top;
       const timeInMinutes = Math.round((y / rect.height) * 1440);
-      activityStore.insertActivityAtTime(timeInMinutes, {
+      activityStore.insertActivityAtTime(timeInMinutes, currentDate.value, {
         name: "New Activity",
       });
     };
 
     return {
       activityStore,
+      activities,
       hours,
       useTimeFormatter,
       handleTimeAxisAreaClick,

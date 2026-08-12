@@ -8,6 +8,7 @@ import { useActivityStore, Activity } from "@/store/activity";
 
 describe("useDragAndDrop", () => {
   const activities = ref<Activity[] | null>(null);
+  const TEST_DATE = "2023-10-27";
   let mockElementA: HTMLElement;
   let mockElementB: HTMLElement;
   let mockBorder: HTMLElement;
@@ -36,18 +37,21 @@ describe("useDragAndDrop", () => {
         name: "Activity A",
         start_time_minutes: 100,
         duration_minutes: 100,
+        date: TEST_DATE,
       },
       {
         id: 2,
         name: "Activity B",
         start_time_minutes: 200,
         duration_minutes: 100,
+        date: TEST_DATE,
       },
       {
         id: 3,
         name: "Activity C",
         start_time_minutes: 300,
         duration_minutes: 100,
+        date: TEST_DATE,
       },
     ];
     activityStore.initializeActivities(activities.value);
@@ -59,7 +63,7 @@ describe("useDragAndDrop", () => {
     mockElementA.dispatchEvent = vi.fn();
     mockElementA.getBoundingClientRect = vi.fn(() => ({
       top: 100,
-    }));
+    } as DOMRect));
 
     mockElementB = document.createElement("div");
     mockElementB.style.top = "200px";
@@ -68,7 +72,7 @@ describe("useDragAndDrop", () => {
     mockElementB.dispatchEvent = vi.fn();
     mockElementB.getBoundingClientRect = vi.fn(() => ({
       top: 200,
-    }));
+    } as DOMRect));
 
     mockBorder = document.createElement("div");
     mockBorder.style.top = "200px";
@@ -76,14 +80,14 @@ describe("useDragAndDrop", () => {
     mockBorder.dispatchEvent = vi.fn();
     mockBorder.getBoundingClientRect = vi.fn(() => ({
       top: 200,
-    }));
+    } as DOMRect));
 
     mockTimeMarkers = document.createElement("div");
     mockTimeMarkers.getBoundingClientRect = vi.fn(() => ({
       left: 0,
       right: 100,
       top: 0,
-    }));
+    } as DOMRect));
 
     vi.spyOn(document, "querySelectorAll").mockImplementation((selector) => {
       if (selector === ".activity-item") {
@@ -98,7 +102,7 @@ describe("useDragAndDrop", () => {
               top: 300,
             }),
           },
-        ];
+        ] as any;
       } else if (selector === ".activity-border") {
         return [
           mockBorder,
@@ -110,9 +114,9 @@ describe("useDragAndDrop", () => {
               top: 300,
             }),
           },
-        ];
+        ] as any;
       }
-      return [];
+      return [] as any;
     });
     vi.spyOn(document, "querySelector").mockImplementation((selector) => {
       if (selector === ".time-axis-area") {
@@ -124,11 +128,13 @@ describe("useDragAndDrop", () => {
     const TestComponent = defineComponent({
       setup() {
         const activityStore = useActivityStore();
-        const dragAndDrop = useDragAndDrop();
+        const dragAndDrop = useDragAndDrop(TEST_DATE);
         startDrag = dragAndDrop.startDrag;
         moveDrag = dragAndDrop.moveDrag;
         endDrag = dragAndDrop.endDrag;
-        return { activities: activityStore.getActivitiesForDay };
+        return {
+            get activities() { return activityStore.getActivitiesForDay(TEST_DATE) }
+        };
       },
       template: "<div></div>",
     });
@@ -139,12 +145,13 @@ describe("useDragAndDrop", () => {
   it("should not change start time of activity A or end time of activity B when dragging the border", async () => {
     await nextTick(); // Wait for onMounted to run
 
-    expect(wrapper.vm.activities).not.toBeNull();
-    if (wrapper.vm.activities) {
-      const initialStartTimeA = wrapper.vm.activities[0].start_time_minutes;
+    const currentActivities = wrapper.vm.activities;
+    expect(currentActivities).not.toBeNull();
+    if (currentActivities) {
+      const initialStartTimeA = currentActivities[0].start_time_minutes;
       const initialEndTimeB =
-        wrapper.vm.activities[1].start_time_minutes +
-        wrapper.vm.activities[1].duration_minutes;
+        currentActivities[1].start_time_minutes +
+        currentActivities[1].duration_minutes;
 
       // Simulate mousedown on the border between A and B
       const mousedownEvent = new MouseEvent("mousedown", { clientY: 150 });

@@ -5,6 +5,7 @@ export interface Activity {
   name: string;
   start_time_minutes: number;
   duration_minutes: number;
+  date: string; // ISO 8601 YYYY-MM-DD
 }
 
 interface State {
@@ -17,12 +18,13 @@ export const useActivityStore = defineStore("activity", {
     activities: [],
     nextId: 1,
   }),
-  persist: true,
+  persist: true, // Defaults to localStorage
   getters: {
-    getActivitiesForDay(state): Activity[] {
+    getActivitiesForDay: (state) => (date: string): Activity[] => {
       return state.activities
         .filter(
           (activity) =>
+            activity.date === date &&
             activity.start_time_minutes >= 0 &&
             activity.start_time_minutes <= 1440,
         )
@@ -30,10 +32,11 @@ export const useActivityStore = defineStore("activity", {
     },
     findActivityAtTime:
       (state) =>
-      (time: number): Activity | null => {
+      (time: number, date: string): Activity | null => {
         return (
           state.activities.find(
             (activity) =>
+              activity.date === date &&
               time >= activity.start_time_minutes &&
               time < activity.start_time_minutes + activity.duration_minutes,
           ) || null
@@ -41,11 +44,11 @@ export const useActivityStore = defineStore("activity", {
       },
     findActivitiesAfterTime:
       (state) =>
-      (time: number): Activity[] => {
+      (time: number, date: string): Activity[] => {
         return state.activities
           .filter(
             (activity) =>
-              activity.start_time_minutes > time,
+              activity.date === date && activity.start_time_minutes > time,
           )
           .sort((a, b) => a.start_time_minutes - b.start_time_minutes);
       },
@@ -69,17 +72,18 @@ export const useActivityStore = defineStore("activity", {
     },
     insertActivityAtTime(
       time: number,
-      newActivity: Omit<Activity, "id" | "duration_minutes">,
+      date: string,
+      newActivity: Omit<Activity, "id" | "duration_minutes" | "date">,
     ) {
-      const existingActivity = this.findActivityAtTime(time);
-      const nextActivities = this.findActivitiesAfterTime(time);
+      const existingActivity = this.findActivityAtTime(time, date);
+      const nextActivities = this.findActivitiesAfterTime(time, date);
 
       if (existingActivity) {
         if (existingActivity.start_time_minutes === time) {
           this.removeActivity(existingActivity.id);
-        }
-        else {
-          existingActivity.duration_minutes = time - existingActivity.start_time_minutes;
+        } else {
+          existingActivity.duration_minutes =
+            time - existingActivity.start_time_minutes;
         }
       }
 
@@ -95,6 +99,7 @@ export const useActivityStore = defineStore("activity", {
         id: this.nextId++,
         start_time_minutes: time,
         duration_minutes: newDuration,
+        date: date,
       };
       this.activities.push(fullNewActivity);
       this.activities.sort(
