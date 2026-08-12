@@ -4,6 +4,8 @@
 
 /dist/
 /node_modules/
+src/node_modules/
+.vite/
 /package-lock.json
 
 # Log files
