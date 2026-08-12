@@ -61,33 +61,45 @@ describe("useDragAndDrop", () => {
     mockElementA.style.height = "100px";
     mockElementA.addEventListener = vi.fn();
     mockElementA.dispatchEvent = vi.fn();
-    mockElementA.getBoundingClientRect = vi.fn(() => ({
-      top: 100,
-    } as DOMRect));
+    mockElementA.getBoundingClientRect = vi.fn(
+      () =>
+        ({
+          top: 100,
+        }) as DOMRect,
+    );
 
     mockElementB = document.createElement("div");
     mockElementB.style.top = "200px";
     mockElementB.style.height = "100px";
     mockElementB.addEventListener = vi.fn();
     mockElementB.dispatchEvent = vi.fn();
-    mockElementB.getBoundingClientRect = vi.fn(() => ({
-      top: 200,
-    } as DOMRect));
+    mockElementB.getBoundingClientRect = vi.fn(
+      () =>
+        ({
+          top: 200,
+        }) as DOMRect,
+    );
 
     mockBorder = document.createElement("div");
     mockBorder.style.top = "200px";
     mockBorder.addEventListener = vi.fn();
     mockBorder.dispatchEvent = vi.fn();
-    mockBorder.getBoundingClientRect = vi.fn(() => ({
-      top: 200,
-    } as DOMRect));
+    mockBorder.getBoundingClientRect = vi.fn(
+      () =>
+        ({
+          top: 200,
+        }) as DOMRect,
+    );
 
     mockTimeMarkers = document.createElement("div");
-    mockTimeMarkers.getBoundingClientRect = vi.fn(() => ({
-      left: 0,
-      right: 100,
-      top: 0,
-    } as DOMRect));
+    mockTimeMarkers.getBoundingClientRect = vi.fn(
+      () =>
+        ({
+          left: 0,
+          right: 100,
+          top: 0,
+        }) as DOMRect,
+    );
 
     vi.spyOn(document, "querySelectorAll").mockImplementation((selector) => {
       if (selector === ".activity-item") {
@@ -102,7 +114,7 @@ describe("useDragAndDrop", () => {
               top: 300,
             }),
           },
-        ] as any;
+        ] as unknown as NodeListOf<Element>;
       } else if (selector === ".activity-border") {
         return [
           mockBorder,
@@ -114,9 +126,9 @@ describe("useDragAndDrop", () => {
               top: 300,
             }),
           },
-        ] as any;
+        ] as unknown as NodeListOf<Element>;
       }
-      return [] as any;
+      return [] as unknown as NodeListOf<Element>;
     });
     vi.spyOn(document, "querySelector").mockImplementation((selector) => {
       if (selector === ".time-axis-area") {
@@ -133,7 +145,9 @@ describe("useDragAndDrop", () => {
         moveDrag = dragAndDrop.moveDrag;
         endDrag = dragAndDrop.endDrag;
         return {
-            get activities() { return activityStore.getActivitiesForDay(TEST_DATE) }
+          get activities() {
+            return activityStore.getActivitiesForDay(TEST_DATE);
+          },
         };
       },
       template: "<div></div>",

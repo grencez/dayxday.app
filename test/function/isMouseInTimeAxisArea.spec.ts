@@ -43,13 +43,17 @@ describe("isMouseInTimeAxisArea", () => {
   // TouchEvent tests
   it("should return true for a TouchEvent inside the area", () => {
     const touch = { clientX: 50 };
-    const event = new TouchEvent("touchmove", { touches: [touch as any] });
+    const event = new TouchEvent("touchmove", {
+      touches: [touch as unknown as Touch],
+    });
     expect(isMouseInTimeAxisArea(event, timeAxisRect)).toBe(true);
   });
 
   it("should return false for a TouchEvent outside the area", () => {
     const touch = { clientX: 150 };
-    const event = new TouchEvent("touchmove", { touches: [touch as any] });
+    const event = new TouchEvent("touchmove", {
+      touches: [touch as unknown as Touch],
+    });
     expect(isMouseInTimeAxisArea(event, timeAxisRect)).toBe(false);
   });
 

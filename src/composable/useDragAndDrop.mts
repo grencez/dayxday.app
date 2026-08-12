@@ -1,5 +1,5 @@
 import { onMounted, onUnmounted, ref, nextTick } from "vue";
-import { useActivityStore, Activity } from "../store/activity";
+import { useActivityStore } from "../store/activity";
 import { calculateSnappedY } from "../function/calculateSnappedY";
 import { isMouseInTimeAxisArea } from "../function/isMouseInTimeAxisArea";
 import { updateActivityElementStyle } from "../function/updateActivityElementStyle";
@@ -19,7 +19,6 @@ export function useDragAndDrop(date: string) {
   let initialDurationA = 0;
   let initialDurationB = 0;
 
-  let activity_orig_screen_y = 0;
   let mouse_orig_screen_y = 0;
   let border_orig_screen_y = 0;
 
@@ -47,7 +46,6 @@ export function useDragAndDrop(date: string) {
     } else {
       startActivityDrag(item, index);
     }
-    activity_orig_screen_y = border_orig_screen_y - initialDurationA;
   };
 
   /**
@@ -153,9 +151,7 @@ export function useDragAndDrop(date: string) {
    */
   const endActivityDrag = () => {
     const activities = activityStore.getActivitiesForDay(date);
-    const activity = activities.find(
-      (a) => a.id === draggedActivityId,
-    );
+    const activity = activities.find((a) => a.id === draggedActivityId);
     if (activity) {
       activityStore.updateActivity(activity.id, {
         duration_minutes: activity.duration_minutes,
@@ -186,9 +182,7 @@ export function useDragAndDrop(date: string) {
    */
   function handleActivityResize(diffY: number) {
     const activities = activityStore.getActivitiesForDay(date);
-    const activity = activities.find(
-      (a) => a.id === draggedActivityId,
-    );
+    const activity = activities.find((a) => a.id === draggedActivityId);
     if (!activity) return;
 
     const newDuration = initialDurationA + diffY;
@@ -197,18 +191,12 @@ export function useDragAndDrop(date: string) {
       activityStore.updateActivity(activity.id, {
         duration_minutes: newDuration,
       });
-      const activityIndex = activities.findIndex(
-        (a) => a.id === activity.id,
-      );
+      const activityIndex = activities.findIndex((a) => a.id === activity.id);
       updateActivityElementStyle(activityIndex, {
         height: newDuration,
       });
 
-      for (
-        let i = activityIndex + 1;
-        i < activities.length;
-        i++
-      ) {
+      for (let i = activityIndex + 1; i < activities.length; i++) {
         const prevActivity = activities[i - 1];
         const newStartTime =
           prevActivity.start_time_minutes + prevActivity.duration_minutes;
@@ -228,10 +216,7 @@ export function useDragAndDrop(date: string) {
     draggedBorderIndex: number,
   ) {
     const activities = activityStore.getActivitiesForDay(date);
-    if (
-      draggedBorderIndex < 0 ||
-      draggedBorderIndex >= activities.length - 1
-    ) {
+    if (draggedBorderIndex < 0 || draggedBorderIndex >= activities.length - 1) {
       return;
     }
 
@@ -307,9 +292,7 @@ export function useDragAndDrop(date: string) {
     const activities = activityStore.getActivitiesForDay(date);
     if (target.classList.contains("activity-item")) {
       const activityId = Number(target.dataset.activityId);
-      const index = activities.findIndex(
-        (a) => a.id === activityId,
-      );
+      const index = activities.findIndex((a) => a.id === activityId);
       if (index !== -1) {
         startDrag(e, target, index, false);
       }
@@ -326,9 +309,7 @@ export function useDragAndDrop(date: string) {
     const activities = activityStore.getActivitiesForDay(date);
     if (target.classList.contains("activity-item")) {
       const activityId = Number(target.dataset.activityId);
-      const index = activities.findIndex(
-        (a) => a.id === activityId,
-      );
+      const index = activities.findIndex((a) => a.id === activityId);
       if (index !== -1) {
         startDrag(e, target, index, false);
       }

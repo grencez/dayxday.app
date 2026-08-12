@@ -1,5 +1,3 @@
-import { defineComponent } from "vue";
-import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { useActivityStore, Activity } from "@/store/activity";
 import { describe, beforeEach, it, expect } from "vitest";
@@ -51,7 +49,9 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
     store.updateActivity(1, { name: "Updated Activity" });
-    expect(store.getActivitiesForDay(TEST_DATE)[0].name).toBe("Updated Activity");
+    expect(store.getActivitiesForDay(TEST_DATE)[0].name).toBe(
+      "Updated Activity",
+    );
   });
 
   it("should find an activity at a specific time", () => {

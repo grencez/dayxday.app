@@ -2,10 +2,14 @@
   <div class="day-view">
     <h1>Day View</h1>
     <div class="button-bar">
-      <button @click="resetActivities" class="reset-button">Reset</button>
-      <button @click="clearActivities" class="clear-button">Clear</button>
+      <button class="reset-button" @click="resetActivities">Reset</button>
+      <button class="clear-button" @click="clearActivities">Clear</button>
     </div>
-    <div class="time-axis-area" @click="handleTimeAxisAreaClick" ref="timeAxisAreaRef">
+    <div
+      ref="timeAxisAreaRef"
+      class="time-axis-area"
+      @click="handleTimeAxisAreaClick"
+    >
       <div
         v-for="hour in hours"
         :key="hour"
@@ -19,10 +23,7 @@
       </div>
     </div>
     <div class="activity-list">
-      <template
-        v-for="(activity, index) in activities"
-        :key="activity.id"
-      >
+      <template v-for="(activity, index) in activities" :key="activity.id">
         <ActivityItem
           :activity="activity"
           class="activity-item"
@@ -68,7 +69,9 @@ export default {
 
     useDragAndDrop(currentDate.value);
 
-    const activities = computed(() => activityStore.getActivitiesForDay(currentDate.value));
+    const activities = computed(() =>
+      activityStore.getActivitiesForDay(currentDate.value),
+    );
 
     const timeAxisAreaRef = ref<HTMLElement | null>(null);
 
