@@ -20,16 +20,18 @@ export const useActivityStore = defineStore("activity", {
   }),
   persist: true, // Defaults to localStorage
   getters: {
-    getActivitiesForDay: (state) => (date: string): Activity[] => {
-      return state.activities
-        .filter(
-          (activity) =>
-            activity.date === date &&
-            activity.start_time_minutes >= 0 &&
-            activity.start_time_minutes <= 1440,
-        )
-        .sort((a, b) => a.start_time_minutes - b.start_time_minutes);
-    },
+    getActivitiesForDay:
+      (state) =>
+      (date: string): Activity[] => {
+        return state.activities
+          .filter(
+            (activity) =>
+              activity.date === date &&
+              activity.start_time_minutes >= 0 &&
+              activity.start_time_minutes <= 1440,
+          )
+          .sort((a, b) => a.start_time_minutes - b.start_time_minutes);
+      },
     findActivityAtTime:
       (state) =>
       (time: number, date: string): Activity | null => {

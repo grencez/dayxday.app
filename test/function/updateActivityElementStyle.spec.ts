@@ -19,7 +19,9 @@ describe("updateActivityElementStyle", () => {
       <div class="activity-item"></div>
     `;
     updateActivityElementStyle(1, { top: 100 });
-    const element = container.querySelectorAll(".activity-item")[1] as HTMLElement;
+    const element = container.querySelectorAll(
+      ".activity-item",
+    )[1] as HTMLElement;
     expect(element.style.top).toBe("100px");
   });
 

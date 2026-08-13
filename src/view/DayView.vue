@@ -31,6 +31,7 @@
             top: activity.start_time_minutes + 'px',
             height: activity.duration_minutes + 'px',
           }"
+          @rename="handleRename"
         />
         <div
           v-if="index < activities.length - 1"
@@ -161,6 +162,10 @@ export default {
       activityStore.initializeActivities([]);
     };
 
+    const handleRename = (payload: { id: number; name: string }) => {
+      activityStore.updateActivity(payload.id, { name: payload.name });
+    };
+
     // Include 24 to show the final 00:00
     const hours = Array.from({ length: 25 }, (_, i) => i);
 
@@ -185,6 +190,7 @@ export default {
       timeAxisAreaRef,
       resetActivities,
       clearActivities,
+      handleRename,
     };
   },
 };

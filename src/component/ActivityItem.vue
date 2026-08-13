@@ -4,7 +4,8 @@
     :data-activity-id="activity.id"
     :contenteditable="false"
     @dblclick="makeEditable"
-    @blur="makeUneditable"
+    @blur="commitRename"
+    @keydown="handleKeydown"
   >
     {{ activity.name }}
   </div>
@@ -19,13 +20,30 @@ export default {
       required: true,
     },
   },
+  emits: ["rename"],
   methods: {
     makeEditable(event) {
-      event.target.contentEditable = true;
-      event.target.focus();
+      event.currentTarget.contentEditable = "true";
+      event.currentTarget.focus();
     },
-    makeUneditable(event) {
-      event.target.contentEditable = false;
+    commitRename(event) {
+      const element = event.currentTarget;
+      element.contentEditable = "false";
+      const newName = element.textContent.trim();
+      if (newName && newName !== this.activity.name) {
+        this.$emit("rename", { id: this.activity.id, name: newName });
+      } else {
+        element.textContent = this.activity.name;
+      }
+    },
+    handleKeydown(event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this.commitRename(event);
+      } else if (event.key === "Escape") {
+        event.currentTarget.textContent = this.activity.name;
+        event.currentTarget.contentEditable = "false";
+      }
     },
   },
 };

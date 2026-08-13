@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "fmt": "prettier --write .",
+    "tidy": "prettier --write .",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run"

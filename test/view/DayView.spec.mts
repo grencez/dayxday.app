@@ -1,5 +1,6 @@
 import { mount } from "@vue/test-utils";
 import DayView from "@/view/DayView.vue";
+import ActivityItem from "@/component/ActivityItem.vue";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { createPinia, setActivePinia } from "pinia";
@@ -114,7 +115,7 @@ describe("DayView.vue", () => {
     const timeMarkersAreaElement = timeMarkersArea.element as HTMLElement;
 
     // Mock getBoundingClientRect
-    vi.spyOn(timeMarkersAreaElement, 'getBoundingClientRect').mockReturnValue({
+    vi.spyOn(timeMarkersAreaElement, "getBoundingClientRect").mockReturnValue({
       x: 0,
       y: 0,
       width: 100,
@@ -133,14 +134,14 @@ describe("DayView.vue", () => {
           left: 0,
           right: 100,
           bottom: 1440,
-        }
-      }
+        };
+      },
     } as DOMRect);
 
     const rect = timeMarkersAreaElement.getBoundingClientRect();
 
     // Simulate a click on the time marker area at the vertical position of the 3rd time marker (hour 2)
-    const y = (2 * 60 + 20) / 1440 * rect.height;
+    const y = ((2 * 60 + 20) / 1440) * rect.height;
 
     await timeMarkersArea.trigger("click", { clientY: rect.top + y });
     await wrapper.vm.$nextTick();
@@ -173,14 +174,14 @@ describe("DayView.vue", () => {
 
   it("should resize the correct activity after inserting a new activity", async () => {
     const wrapper = mount(DayView, {
-      attachTo: document.body
+      attachTo: document.body,
     });
     const activityStore = useActivityStore();
     const timeMarkersArea = wrapper.find(".time-axis-area");
     const timeMarkersAreaElement = timeMarkersArea.element as HTMLElement;
 
     // Mock getBoundingClientRect for timeMarkersArea
-    vi.spyOn(timeMarkersAreaElement, 'getBoundingClientRect').mockReturnValue({
+    vi.spyOn(timeMarkersAreaElement, "getBoundingClientRect").mockReturnValue({
       x: 0,
       y: 0,
       width: 100,
@@ -189,18 +190,18 @@ describe("DayView.vue", () => {
       left: 0,
       right: 100,
       bottom: 1440,
-      toJSON: () => ({})
+      toJSON: () => ({}),
     } as DOMRect);
 
     // Insert new activity at 140 min (like previous test)
     const rect = timeMarkersAreaElement.getBoundingClientRect();
-    const y = (2 * 60 + 20) / 1440 * rect.height;
+    const y = ((2 * 60 + 20) / 1440) * rect.height;
     await timeMarkersArea.trigger("click", { clientY: rect.top + y });
     await wrapper.vm.$nextTick();
 
-    const newActivity = activityStore.getActivitiesForDay(TEST_DATE).find(
-      (activity) => activity.name === "New Activity",
-    );
+    const newActivity = activityStore
+      .getActivitiesForDay(TEST_DATE)
+      .find((activity) => activity.name === "New Activity");
     expect(newActivity).toBeDefined();
 
     // Now resize the FIRST activity (id=1, 0-60min)
@@ -208,16 +209,16 @@ describe("DayView.vue", () => {
     const firstActivityElement = firstActivityItem.element as HTMLElement;
 
     // Mock getBoundingClientRect for the activity
-    vi.spyOn(firstActivityElement, 'getBoundingClientRect').mockReturnValue({
-        top: 0,
-        height: 60,
-        left: 0,
-        right: 100,
-        bottom: 60,
-        x: 0,
-        y: 0,
-        width: 100,
-        toJSON: () => ({})
+    vi.spyOn(firstActivityElement, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      height: 60,
+      left: 0,
+      right: 100,
+      bottom: 60,
+      x: 0,
+      y: 0,
+      width: 100,
+      toJSON: () => ({}),
     } as DOMRect);
 
     // Mock getBoundingClientRect for the border (if we were dragging border)
@@ -256,7 +257,9 @@ describe("DayView.vue", () => {
 
     // Dispatch mousemove on window
     // Use clientX: 200 to be outside the time-axis-area (0-100) to avoid snapping
-    window.dispatchEvent(new MouseEvent("mousemove", { clientY: 50, clientX: 200 }));
+    window.dispatchEvent(
+      new MouseEvent("mousemove", { clientY: 50, clientX: 200 }),
+    );
 
     // Dispatch mouseup on window
     window.dispatchEvent(new MouseEvent("mouseup"));
@@ -321,9 +324,25 @@ describe("DayView.vue", () => {
 
     // Verify start times to be sure
     const activities = activityStore.getActivitiesForDay(TEST_DATE);
-    const updatedNewActivity = activities.find(a => a.name === "New Activity");
+    const updatedNewActivity = activities.find(
+      (a) => a.name === "New Activity",
+    );
     expect(updatedNewActivity?.start_time_minutes).toBe(180); // shifted by 40
 
+    wrapper.unmount();
+  });
+
+  it("updates the store when an activity is renamed", async () => {
+    const wrapper = mount(DayView);
+    await new Promise((resolve) => setTimeout(resolve, 0)); // Wait for onMounted
+    const activityStore = useActivityStore();
+    const firstItem = wrapper.findComponent(ActivityItem);
+    firstItem.vm.$emit("rename", { id: 1, name: "Renamed Activity" });
+    await wrapper.vm.$nextTick();
+    const renamed = activityStore
+      .getActivitiesForDay(TEST_DATE)
+      .find((a) => a.id === 1);
+    expect(renamed?.name).toBe("Renamed Activity");
     wrapper.unmount();
   });
 });
