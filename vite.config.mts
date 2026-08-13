@@ -43,6 +43,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["../test/**/*.spec.{mts,ts}"],
+    exclude: ["../test/browse/**"],
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },

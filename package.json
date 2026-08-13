@@ -8,7 +8,10 @@
     "tidy": "prettier --write .",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:browse": "playwright test",
+    "test:preview": "playwright test -c playwright.preview.config.ts",
+    "tidytest": "npm run tidy && npm run lint && npm test && npm run test:preview"
   },
   "dependencies": {
     "idb": "^8.0.1",
@@ -18,6 +21,7 @@
     "vue-router": "^4.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@vitejs/plugin-vue": "^6.0.2",
     "@vue/test-utils": "^2.4.6",
     "eslint": "^9.17.0",
