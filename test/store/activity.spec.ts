@@ -227,10 +227,15 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(60, TEST_DATE, {
-      name: "Inserted Activity",
-      start_time_minutes: 60,
-    });
+    store.insertActivityAtTime(
+      60,
+      TEST_DATE,
+      {
+        name: "Inserted Activity",
+        start_time_minutes: 60,
+      },
+      1440,
+    );
 
     const insertedActivity = store.findActivityAtTime(60, TEST_DATE);
     expect(insertedActivity).not.toBeNull();
@@ -270,10 +275,15 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(60, TEST_DATE, {
-      name: "Inserted Activity",
-      start_time_minutes: 60,
-    });
+    store.insertActivityAtTime(
+      60,
+      TEST_DATE,
+      {
+        name: "Inserted Activity",
+        start_time_minutes: 60,
+      },
+      1440,
+    );
 
     const existingActivity = store.findActivityAtTime(30, TEST_DATE);
     expect(existingActivity).not.toBeNull();
@@ -293,10 +303,15 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(60, TEST_DATE, {
-      name: "New Activity",
-      start_time_minutes: 60,
-    });
+    store.insertActivityAtTime(
+      60,
+      TEST_DATE,
+      {
+        name: "New Activity",
+        start_time_minutes: 60,
+      },
+      1440,
+    );
 
     const oldActivity = store.findActivityAtTime(60, TEST_DATE);
     expect(oldActivity).not.toBeNull();
@@ -326,10 +341,15 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(60, TEST_DATE, {
-      name: "Inserted Activity",
-      start_time_minutes: 60,
-    });
+    store.insertActivityAtTime(
+      60,
+      TEST_DATE,
+      {
+        name: "Inserted Activity",
+        start_time_minutes: 60,
+      },
+      1440,
+    );
 
     const insertedActivity = store.findActivityAtTime(60, TEST_DATE);
     expect(insertedActivity).not.toBeNull();
@@ -343,7 +363,7 @@ describe("activity store", () => {
 
   it("should insert into an empty schedule", () => {
     const store = useActivityStore();
-    store.insertActivityAtTime(60, TEST_DATE, { name: "New Activity" });
+    store.insertActivityAtTime(60, TEST_DATE, { name: "New Activity" }, 1440);
     const activities = store.getActivitiesForDay(TEST_DATE);
     expect(activities.length).toBe(1);
     expect(activities[0].start_time_minutes).toBe(60);
@@ -363,7 +383,7 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(60, TEST_DATE, { name: "New Activity" });
+    store.insertActivityAtTime(60, TEST_DATE, { name: "New Activity" }, 1440);
     const updatedActivities = store.getActivitiesForDay(TEST_DATE);
 
     expect(updatedActivities.length).toBe(2);
@@ -386,7 +406,7 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(180, TEST_DATE, { name: "New Activity" });
+    store.insertActivityAtTime(180, TEST_DATE, { name: "New Activity" }, 1440);
     const updatedActivities = store.getActivitiesForDay(TEST_DATE);
 
     expect(updatedActivities.length).toBe(2);
@@ -423,7 +443,7 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(60, TEST_DATE, { name: "New Activity" });
+    store.insertActivityAtTime(60, TEST_DATE, { name: "New Activity" }, 1440);
     const updatedActivities = store.getActivitiesForDay(TEST_DATE);
 
     expect(updatedActivities.length).toBe(3);
@@ -456,7 +476,7 @@ describe("activity store", () => {
     ];
     store.initializeActivities(activities);
 
-    store.insertActivityAtTime(20, TEST_DATE, { name: "New Activity" });
+    store.insertActivityAtTime(20, TEST_DATE, { name: "New Activity" }, 1440);
     const updatedActivities = store.getActivitiesForDay(TEST_DATE);
 
     expect(updatedActivities.length).toBe(3);
@@ -470,12 +490,36 @@ describe("activity store", () => {
     expect(updatedActivities[2].name).toBe("Second");
   });
 
-  it("should insert at the end of the day", () => {
+  it("rejects zero-length and future manual insertions", () => {
     const store = useActivityStore();
-    store.insertActivityAtTime(1440, TEST_DATE, { name: "New Activity" });
-    const activities = store.getActivitiesForDay(TEST_DATE);
-    expect(activities.length).toBe(1);
-    expect(activities[0].start_time_minutes).toBe(1440);
-    expect(activities[0].duration_minutes).toBe(0);
+    store.insertActivityAtTime(1440, TEST_DATE, { name: "New Activity" }, 1440);
+    store.insertActivityAtTime(601, TEST_DATE, { name: "Future" }, 600);
+
+    expect(store.getActivitiesForDay(TEST_DATE)).toEqual([]);
+  });
+
+  it("limits a new manual activity without changing legacy records", () => {
+    const store = useActivityStore();
+    const legacy: Activity = {
+      id: 9,
+      name: "Legacy future block",
+      start_time_minutes: 700,
+      duration_minutes: 300,
+      date: TEST_DATE,
+    };
+    store.initializeActivities([legacy]);
+
+    store.insertActivityAtTime(500, TEST_DATE, { name: "Manual" }, 540);
+
+    expect(store.getActivitiesForDay(TEST_DATE)).toEqual([
+      {
+        id: 10,
+        name: "Manual",
+        start_time_minutes: 500,
+        duration_minutes: 40,
+        date: TEST_DATE,
+      },
+      legacy,
+    ]);
   });
 });

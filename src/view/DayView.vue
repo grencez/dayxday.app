@@ -1,6 +1,7 @@
 <template>
   <div class="day-view">
     <h1>Day View</h1>
+    <CapturePanel :now-ms="nowMs" />
     <div
       ref="timeAxisAreaRef"
       class="time-axis-area"
@@ -20,7 +21,13 @@
     </div>
     <div class="activity-list">
       <p v-if="activities.length === 0" class="empty-state">
-        Click or tap the timeline on the left to create your first activity.
+        <template v-if="activityStore.runningActivity">
+          Your current activity will appear here when it ends.
+        </template>
+        <template v-else>
+          Start an activity above, or tap the timeline on the left to
+          reconstruct past time.
+        </template>
       </p>
       <template v-for="(activity, index) in activities" :key="activity.id">
         <ActivityItem
@@ -52,20 +59,27 @@
 <script lang="ts">
 import { useDragAndDrop } from "../composable/useDragAndDrop";
 import { useActivityStore } from "../store/activity";
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import ActivityItem from "../component/ActivityItem.vue";
+import CapturePanel from "../component/CapturePanel.vue";
 import { useTimeFormatter } from "../composable/useTimeFormatter";
-import { getLocalDateString } from "../function/getLocalDateString";
+import {
+  getLocalDayAtMs,
+  getLocalMinuteOfDay,
+} from "../function/localCalendar";
 
 export default {
   name: "DayView",
   components: {
     ActivityItem,
+    CapturePanel,
   },
   setup() {
     const activityStore = useActivityStore();
-    const currentDate = ref(getLocalDateString());
+    const nowMs = ref(Date.now());
+    const currentDate = computed(() => getLocalDayAtMs(nowMs.value));
 
+    activityStore.reconcileRunning(nowMs.value);
     useDragAndDrop(currentDate);
 
     const activities = computed(() =>
@@ -81,6 +95,20 @@ export default {
     // Include 24 to show the final 00:00
     const hours = Array.from({ length: 25 }, (_, i) => i);
 
+    let reconcileTimer: ReturnType<typeof setInterval> | undefined;
+    const updateNowAndReconcile = () => {
+      nowMs.value = Date.now();
+      activityStore.reconcileRunning(nowMs.value);
+    };
+
+    onMounted(() => {
+      reconcileTimer = setInterval(updateNowAndReconcile, 1000);
+    });
+
+    onUnmounted(() => {
+      if (reconcileTimer !== undefined) clearInterval(reconcileTimer);
+    });
+
     const handleTimeAxisAreaClick = (event: MouseEvent) => {
       if (!timeAxisAreaRef.value) {
         return;
@@ -88,9 +116,12 @@ export default {
       const rect = timeAxisAreaRef.value.getBoundingClientRect();
       const y = event.clientY - rect.top;
       const timeInMinutes = Math.round((y / rect.height) * 1440);
-      activityStore.insertActivityAtTime(timeInMinutes, currentDate.value, {
-        name: "New Activity",
-      });
+      activityStore.insertActivityAtTime(
+        timeInMinutes,
+        currentDate.value,
+        { name: "New Activity" },
+        Math.min(1440, getLocalMinuteOfDay(new Date(nowMs.value))),
+      );
     };
 
     return {
@@ -101,6 +132,8 @@ export default {
       handleTimeAxisAreaClick,
       timeAxisAreaRef,
       handleRename,
+      nowMs,
+      currentDate,
     };
   },
 };

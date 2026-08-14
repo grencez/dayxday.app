@@ -116,13 +116,27 @@ describe("DayView.vue", () => {
     expect(wrapper.find(".clear-button").exists()).toBe(false);
   });
 
-  it("shows timeline creation instructions when the day is empty", () => {
+  it("shows capture-first instructions when the day is empty", () => {
     const activityStore = useActivityStore();
     activityStore.clearActivitiesForDay(TEST_DATE);
     const wrapper = mount(DayView);
 
     expect(wrapper.find(".empty-state").text()).toBe(
-      "Click or tap the timeline on the left to create your first activity.",
+      "Start an activity above, or tap the timeline on the left to reconstruct past time.",
+    );
+  });
+
+  it("explains why a running activity is not yet on an empty timeline", () => {
+    const activityStore = useActivityStore();
+    activityStore.clearActivitiesForDay(TEST_DATE);
+    activityStore.runningActivity = {
+      name: "Focus",
+      startedAtMs: Date.now(),
+    };
+    const wrapper = mount(DayView);
+
+    expect(wrapper.find(".empty-state").text()).toBe(
+      "Your current activity will appear here when it ends.",
     );
   });
 
@@ -379,5 +393,30 @@ describe("DayView.vue", () => {
       .find((a) => a.id === 1);
     expect(renamed?.name).toBe("Renamed Activity");
     wrapper.unmount();
+  });
+
+  it("rolls its local date at midnight, reconciles, and cleans up its timer", async () => {
+    vi.useFakeTimers();
+    const beforeMidnight = new Date(2024, 4, 10, 23, 59, 59, 500);
+    vi.setSystemTime(beforeMidnight);
+    const activityStore = useActivityStore();
+    activityStore.initializeActivities([]);
+    activityStore.runningActivity = {
+      name: "Late work",
+      startedAtMs: beforeMidnight.getTime() - 60_000,
+    };
+    const wrapper = mount(DayView);
+
+    expect(wrapper.vm.currentDate).toBe("2024-05-10");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(wrapper.vm.currentDate).toBe("2024-05-11");
+    expect(activityStore.runningActivity).toBeNull();
+    expect(activityStore.activities[0].name).toBe("Late work");
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+    wrapper.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
   });
 });
