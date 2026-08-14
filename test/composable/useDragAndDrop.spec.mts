@@ -9,6 +9,8 @@ import { useActivityStore, Activity } from "@/store/activity";
 describe("useDragAndDrop", () => {
   const activities = ref<Activity[] | null>(null);
   const TEST_DATE = "2023-10-27";
+  const SECOND_DATE = "2023-10-28";
+  let selectedDate = ref(TEST_DATE);
   let mockElementA: HTMLElement;
   let mockElementB: HTMLElement;
   let mockBorder: HTMLElement;
@@ -31,6 +33,7 @@ describe("useDragAndDrop", () => {
     global.indexedDB = new IDBFactory();
 
     const activityStore = useActivityStore();
+    selectedDate = ref(TEST_DATE);
     activities.value = [
       {
         id: 1,
@@ -54,7 +57,16 @@ describe("useDragAndDrop", () => {
         date: TEST_DATE,
       },
     ];
-    activityStore.initializeActivities(activities.value);
+    activityStore.initializeActivities([
+      ...activities.value,
+      {
+        id: 4,
+        name: "Activity on second day",
+        start_time_minutes: 400,
+        duration_minutes: 100,
+        date: SECOND_DATE,
+      },
+    ]);
 
     mockElementA = document.createElement("div");
     mockElementA.style.top = "100px";
@@ -140,7 +152,7 @@ describe("useDragAndDrop", () => {
     const TestComponent = defineComponent({
       setup() {
         const activityStore = useActivityStore();
-        const dragAndDrop = useDragAndDrop(TEST_DATE);
+        const dragAndDrop = useDragAndDrop(selectedDate);
         startDrag = dragAndDrop.startDrag;
         moveDrag = dragAndDrop.moveDrag;
         endDrag = dragAndDrop.endDrag;
@@ -212,6 +224,54 @@ describe("useDragAndDrop", () => {
       expectedSnappedEndTime - wrapper.vm.activities[0].start_time_minutes;
 
     expect(newDuration).toBe(expectedSnappedDuration);
+  });
+
+  it("uses the currently selected date when a drag starts", async () => {
+    await nextTick();
+    const activityStore = useActivityStore();
+    selectedDate.value = SECOND_DATE;
+    await nextTick();
+
+    startDrag(
+      new MouseEvent("mousedown", { clientY: 150 }),
+      mockElementA,
+      0,
+      false,
+    );
+    moveDrag(new MouseEvent("mousemove", { clientY: 185, clientX: 150 }));
+    endDrag();
+
+    expect(
+      activityStore.getActivitiesForDay(TEST_DATE)[0].duration_minutes,
+    ).toBe(100);
+    expect(
+      activityStore.getActivitiesForDay(SECOND_DATE)[0].duration_minutes,
+    ).toBe(135);
+  });
+
+  it("keeps a border drag bound to the date where the gesture started", async () => {
+    await nextTick();
+    const activityStore = useActivityStore();
+
+    startDrag(
+      new MouseEvent("mousedown", { clientY: 150 }),
+      mockBorder,
+      0,
+      true,
+    );
+    selectedDate.value = SECOND_DATE;
+    await nextTick();
+
+    moveDrag(new MouseEvent("mousemove", { clientY: 180, clientX: 150 }));
+    expect(() => endDrag()).not.toThrow();
+
+    const firstDay = activityStore.getActivitiesForDay(TEST_DATE);
+    expect(firstDay[0].duration_minutes).toBe(130);
+    expect(firstDay[1].start_time_minutes).toBe(230);
+    expect(firstDay[1].duration_minutes).toBe(70);
+    expect(
+      activityStore.getActivitiesForDay(SECOND_DATE)[0].duration_minutes,
+    ).toBe(100);
   });
 
   it("should not snap when resizing and mouse is outside time markers area", async () => {

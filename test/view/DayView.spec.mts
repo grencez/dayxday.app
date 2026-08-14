@@ -1,13 +1,28 @@
 import { mount } from "@vue/test-utils";
 import DayView from "@/view/DayView.vue";
 import ActivityItem from "@/component/ActivityItem.vue";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { createPinia, setActivePinia } from "pinia";
 import { useActivityStore, Activity } from "@/store/activity";
+import { getLocalDateString } from "@/function/getLocalDateString";
 
 describe("DayView.vue", () => {
-  const TEST_DATE = new Date().toISOString().split("T")[0]; // Use today's date to match DayView default
+  const TEST_DATE = getLocalDateString();
+
+  // Pin the clock to noon on TEST_DATE's calendar day. The two click tests
+  // insert an activity at 2:20 AM (140 min), which is only "in the past" when
+  // the test's "now" is later than 2:20. Basing "now" on the real wall clock
+  // makes the suite fail whenever it runs before 02:20 local time (e.g. CI in
+  // UTC while it's still evening in PDT).
+  function noonOnTestDate(): Date {
+    const [year, month, day] = TEST_DATE.split("-").map(Number);
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   beforeEach(async () => {
     // Mock indexedDB
@@ -95,6 +110,22 @@ describe("DayView.vue", () => {
     expect(wrapper.text()).toContain("Day View");
   });
 
+  it("does not render Reset or Clear controls", () => {
+    const wrapper = mount(DayView);
+    expect(wrapper.find(".reset-button").exists()).toBe(false);
+    expect(wrapper.find(".clear-button").exists()).toBe(false);
+  });
+
+  it("shows timeline creation instructions when the day is empty", () => {
+    const activityStore = useActivityStore();
+    activityStore.clearActivitiesForDay(TEST_DATE);
+    const wrapper = mount(DayView);
+
+    expect(wrapper.find(".empty-state").text()).toBe(
+      "Click or tap the timeline on the left to create your first activity.",
+    );
+  });
+
   it("renders the time markers", () => {
     const wrapper = mount(DayView);
     const timeMarkers = wrapper.findAll(".time-axis-mark");
@@ -109,6 +140,8 @@ describe("DayView.vue", () => {
   });
 
   it("should create a new activity when a time marker is clicked", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(noonOnTestDate());
     const wrapper = mount(DayView);
     const activityStore = useActivityStore();
     const timeMarkersArea = wrapper.find(".time-axis-area");
@@ -173,6 +206,8 @@ describe("DayView.vue", () => {
   });
 
   it("should resize the correct activity after inserting a new activity", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(noonOnTestDate());
     const wrapper = mount(DayView, {
       attachTo: document.body,
     });

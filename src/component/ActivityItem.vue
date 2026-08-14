@@ -51,6 +51,7 @@ export default {
 
 <style scoped>
 .activity-item {
+  box-sizing: border-box;
   position: absolute;
   left: 0;
   right: 0;

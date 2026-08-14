@@ -8,9 +8,22 @@ export interface Activity {
   date: string; // ISO 8601 YYYY-MM-DD
 }
 
+export type DayActivityInput = Omit<Activity, "id" | "date">;
+
 interface State {
   activities: Activity[];
   nextId: number;
+}
+
+function findAvailableId(activities: Activity[], nextId: number): number {
+  const usedIds = new Set(activities.map((activity) => activity.id));
+  let candidate = Math.max(1, nextId);
+
+  while (usedIds.has(candidate)) {
+    candidate += 1;
+  }
+
+  return candidate;
 }
 
 export const useActivityStore = defineStore("activity", {
@@ -63,6 +76,30 @@ export const useActivityStore = defineStore("activity", {
           ? Math.max(...this.activities.map((a) => a.id)) + 1
           : 1;
     },
+    replaceActivitiesForDay(date: string, activities: DayActivityInput[]) {
+      const activitiesForOtherDays = this.activities.filter(
+        (activity) => activity.date !== date,
+      );
+      const replacements: Activity[] = [];
+      let nextId = this.nextId;
+
+      for (const activity of activities) {
+        const id = findAvailableId(
+          [...activitiesForOtherDays, ...replacements],
+          nextId,
+        );
+        replacements.push({ ...activity, id, date });
+        nextId = id + 1;
+      }
+
+      this.activities = [...activitiesForOtherDays, ...replacements];
+      this.nextId = nextId;
+    },
+    clearActivitiesForDay(date: string) {
+      this.activities = this.activities.filter(
+        (activity) => activity.date !== date,
+      );
+    },
     updateActivity(id: number, updates: Partial<Activity>) {
       const activity = this.activities.find((a) => a.id === id);
       if (activity) {
@@ -96,14 +133,16 @@ export const useActivityStore = defineStore("activity", {
         newDuration = 1440 - time; // Assuming 1440 as the end of the day
       }
 
+      const id = findAvailableId(this.activities, this.nextId);
       const fullNewActivity: Activity = {
         ...newActivity,
-        id: this.nextId++,
+        id,
         start_time_minutes: time,
         duration_minutes: newDuration,
         date: date,
       };
       this.activities.push(fullNewActivity);
+      this.nextId = id + 1;
       this.activities.sort(
         (a, b) => a.start_time_minutes - b.start_time_minutes,
       );

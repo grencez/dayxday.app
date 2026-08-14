@@ -1,10 +1,6 @@
 <template>
   <div class="day-view">
     <h1>Day View</h1>
-    <div class="button-bar">
-      <button class="reset-button" @click="resetActivities">Reset</button>
-      <button class="clear-button" @click="clearActivities">Clear</button>
-    </div>
     <div
       ref="timeAxisAreaRef"
       class="time-axis-area"
@@ -23,6 +19,9 @@
       </div>
     </div>
     <div class="activity-list">
+      <p v-if="activities.length === 0" class="empty-state">
+        Click or tap the timeline on the left to create your first activity.
+      </p>
       <template v-for="(activity, index) in activities" :key="activity.id">
         <ActivityItem
           :activity="activity"
@@ -52,10 +51,11 @@
 
 <script lang="ts">
 import { useDragAndDrop } from "../composable/useDragAndDrop";
-import { useActivityStore, Activity } from "../store/activity";
+import { useActivityStore } from "../store/activity";
 import { ref, computed } from "vue";
 import ActivityItem from "../component/ActivityItem.vue";
 import { useTimeFormatter } from "../composable/useTimeFormatter";
+import { getLocalDateString } from "../function/getLocalDateString";
 
 export default {
   name: "DayView",
@@ -64,103 +64,15 @@ export default {
   },
   setup() {
     const activityStore = useActivityStore();
-    // Use today's date for now, matching the test default
-    // In a real app, this would be reactive based on selected date
-    const currentDate = ref(new Date().toISOString().split("T")[0]);
+    const currentDate = ref(getLocalDateString());
 
-    useDragAndDrop(currentDate.value);
+    useDragAndDrop(currentDate);
 
     const activities = computed(() =>
       activityStore.getActivitiesForDay(currentDate.value),
     );
 
     const timeAxisAreaRef = ref<HTMLElement | null>(null);
-
-    const resetActivities = () => {
-      const initialActivities: Activity[] = [
-        {
-          id: 1,
-          name: "Morning Routine",
-          start_time_minutes: 0,
-          duration_minutes: 100,
-          date: currentDate.value,
-        },
-        {
-          id: 2,
-          name: "Work Session",
-          start_time_minutes: 100,
-          duration_minutes: 200,
-          date: currentDate.value,
-        },
-        {
-          id: 3,
-          name: "Lunch Break",
-          start_time_minutes: 300,
-          duration_minutes: 80,
-          date: currentDate.value,
-        },
-        {
-          id: 4,
-          name: "Afternoon Tasks",
-          start_time_minutes: 380,
-          duration_minutes: 150,
-          date: currentDate.value,
-        },
-        {
-          id: 5,
-          name: "Evening Tasks",
-          start_time_minutes: 530,
-          duration_minutes: 100,
-          date: currentDate.value,
-        },
-        {
-          id: 6,
-          name: "Dinner",
-          start_time_minutes: 630,
-          duration_minutes: 60,
-          date: currentDate.value,
-        },
-        {
-          id: 7,
-          name: "Relax",
-          start_time_minutes: 690,
-          duration_minutes: 120,
-          date: currentDate.value,
-        },
-        {
-          id: 8,
-          name: "Bedtime Routine",
-          start_time_minutes: 810,
-          duration_minutes: 60,
-          date: currentDate.value,
-        },
-        {
-          id: 9,
-          name: "Sleep",
-          start_time_minutes: 870,
-          duration_minutes: 570,
-          date: currentDate.value,
-        },
-        {
-          id: 10,
-          name: "Wake Up",
-          start_time_minutes: 1440,
-          duration_minutes: 0,
-          date: currentDate.value,
-        },
-      ];
-      activityStore.initializeActivities(initialActivities);
-    };
-
-    const clearActivities = () => {
-      // Should probably clear all activities or just for the day?
-      // Since initializeActivities replaces everything in the store,
-      // if we had multiple days, this would be bad.
-      // But for now, let's keep it simple as we haven't implemented multi-day filtering in initialization.
-      // But wait, the store only supports initializing the WHOLE list.
-      // So clearActivities effectively clears EVERYTHING.
-      activityStore.initializeActivities([]);
-    };
 
     const handleRename = (payload: { id: number; name: string }) => {
       activityStore.updateActivity(payload.id, { name: payload.name });
@@ -188,8 +100,6 @@ export default {
       useTimeFormatter,
       handleTimeAxisAreaClick,
       timeAxisAreaRef,
-      resetActivities,
-      clearActivities,
       handleRename,
     };
   },
@@ -198,9 +108,10 @@ export default {
 
 <style scoped>
 .day-view {
+  box-sizing: border-box;
   padding: 20px;
   display: grid;
-  grid-template-columns: 60px 1fr; /* Define columns for time markers and activity list */
+  grid-template-columns: 60px minmax(0, 1fr);
   max-width: 1200px;
   width: 100%;
 }
@@ -208,19 +119,6 @@ export default {
 .day-view h1 {
   margin-bottom: 10px;
   grid-column: 1 / 3; /* Span the title across both columns */
-}
-
-.button-bar {
-  grid-column: 1 / 3;
-  margin-bottom: 10px;
-  display: flex;
-  gap: 10px;
-}
-
-.reset-button {
-}
-
-.clear-button {
 }
 
 .time-axis-area {
@@ -254,7 +152,14 @@ export default {
   border: 1px solid #ccc;
   min-height: 1440px;
   margin-top: 0px;
-  min-width: 300px; /* Reduced min-width to prevent excessive blank space */
+  min-width: 0;
+}
+
+.empty-state {
+  margin: 16px;
+  color: #666;
+  line-height: 1.4;
+  pointer-events: none;
 }
 
 .activity-border {
