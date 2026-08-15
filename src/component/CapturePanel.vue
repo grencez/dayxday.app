@@ -104,9 +104,9 @@ function submitOther() {
   min-width: 0;
   padding: 12px;
   margin-bottom: 16px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--color-surface-muted);
 }
 
 .capture-current,
@@ -143,7 +143,7 @@ function submitOther() {
   width: 100%;
   margin-bottom: 6px;
   font-size: 0.85em;
-  color: #555;
+  color: var(--color-muted);
 }
 
 .capture-other input {

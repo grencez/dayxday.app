@@ -11,8 +11,8 @@
   padding: 6px 12px;
   text-align: center;
   font-size: 0.85em;
-  color: #664d03;
-  background-color: #fff3cd;
-  border-bottom: 1px solid #ffe69c;
+  color: var(--color-warning);
+  background-color: var(--color-warning-background);
+  border-bottom: 1px solid var(--color-warning-border);
 }
 </style>

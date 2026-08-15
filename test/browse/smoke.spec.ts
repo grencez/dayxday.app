@@ -42,6 +42,38 @@ test("mobile timeline fits and activity height matches its duration", async ({
   ).toBeLessThan(0.02);
 });
 
+test("follows the system color scheme", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+
+  expect(
+    await page.evaluate(() => ({
+      prefersDark: matchMedia("(prefers-color-scheme: dark)").matches,
+      pageBackground: getComputedStyle(document.body).backgroundColor,
+      pageText: getComputedStyle(document.body).color,
+      captureBackground: getComputedStyle(
+        document.querySelector(".capture-panel")!,
+      ).backgroundColor,
+      receiptBackground: getComputedStyle(
+        document.querySelector(".today-receipt")!,
+      ).backgroundColor,
+    })),
+  ).toEqual({
+    prefersDark: true,
+    pageBackground: "rgb(18, 18, 18)",
+    pageText: "rgb(241, 241, 241)",
+    captureBackground: "rgb(32, 32, 32)",
+    receiptBackground: "rgb(28, 28, 28)",
+  });
+
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect
+    .poll(() =>
+      page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+    )
+    .toBe("rgb(255, 255, 255)");
+});
+
 test("create, rename, and persist an activity across reload", async ({
   page,
 }) => {

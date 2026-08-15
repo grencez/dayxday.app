@@ -190,12 +190,12 @@ export default {
 .tick-mark {
   width: 5px;
   height: 1px;
-  background-color: #000;
+  background-color: var(--color-axis);
 }
 
 .activity-list {
   position: relative; /* Make this relative */
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border);
   min-height: 1440px;
   margin-top: 0px;
   min-width: 0;
@@ -203,7 +203,7 @@ export default {
 
 .empty-state {
   margin: 16px;
-  color: #666;
+  color: var(--color-muted);
   line-height: 1.4;
   pointer-events: none;
 }
@@ -214,7 +214,7 @@ export default {
   right: 0;
   height: 10px;
   cursor: ns-resize;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: var(--color-drag-target);
   touch-action: none; /* Disable touch actions to prevent context menu */
 }
 </style>

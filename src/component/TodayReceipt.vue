@@ -83,9 +83,9 @@ defineProps<{
   min-width: 0;
   padding: 12px;
   margin-bottom: 16px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .receipt-heading,
@@ -118,7 +118,7 @@ defineProps<{
 
 .coverage-summary {
   flex-wrap: wrap;
-  color: #555;
+  color: var(--color-muted);
 }
 
 .coverage-summary progress {
@@ -149,7 +149,7 @@ defineProps<{
 .activity-totals li,
 .receipt-segments li {
   padding: 8px 0;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .activity-totals span,
@@ -162,19 +162,19 @@ defineProps<{
   justify-content: flex-start;
   margin-top: 3px;
   font-size: 0.85em;
-  color: #666;
+  color: var(--color-muted);
 }
 
 .ongoing-label {
   padding: 2px 6px;
   border-radius: 999px;
-  color: #174d25;
-  background: #dff4e4;
+  color: var(--color-current);
+  background: var(--color-current-background);
 }
 
 .receipt-empty {
   margin: 0;
-  color: #666;
+  color: var(--color-muted);
   line-height: 1.4;
 }
 

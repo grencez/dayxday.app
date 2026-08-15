@@ -55,8 +55,8 @@ export default {
   position: absolute;
   left: 0;
   right: 0;
-  background-color: #f0f0f0;
-  border: 1px solid #ddd;
+  background-color: var(--color-activity);
+  border: 1px solid var(--color-border);
   padding: 10px;
   cursor: move;
   overflow: hidden;
