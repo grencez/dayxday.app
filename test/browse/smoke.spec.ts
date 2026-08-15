@@ -1,38 +1,69 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-test("mobile timeline fits and activity height matches its duration", async ({
+const storeKey = "dayxday-structured-tags-v1";
+
+function stateForToday() {
+  const today = new Date();
+  const date = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+  return {
+    activities: [
+      {
+        id: 1,
+        tagIds: ["focus"],
+        start_time_minutes: 60,
+        duration_minutes: 60,
+        date,
+      },
+      {
+        id: 2,
+        tagIds: ["meeting"],
+        start_time_minutes: 120,
+        duration_minutes: 60,
+        date,
+      },
+    ],
+    nextId: 3,
+    runningActivity: null,
+    lastCaptureUndo: null,
+    tagGroups: [
+      {
+        id: "work",
+        name: "Work",
+        tags: [
+          { id: "focus", name: "Focus" },
+          { id: "meeting", name: "Meeting" },
+        ],
+      },
+    ],
+    nextTagId: 1,
+    nextGroupId: 1,
+  };
+}
+
+test("mobile timeline fits and activity height matches duration", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-
-  await expect(page.locator(".empty-state")).toContainText(
-    "Start an activity above",
+  await page.evaluate(
+    ({ key, state }) => {
+      localStorage.clear();
+      localStorage.setItem(key, JSON.stringify(state));
+    },
+    { key: storeKey, state: stateForToday() },
   );
-  await expect(
-    page.getByRole("button", { name: "Populate Store" }),
-  ).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Reset" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Clear" })).toHaveCount(0);
+  await page.reload();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-
-  const safePastMinute = await page.evaluate(() => {
-    const now = new Date();
-    const minute =
-      now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
-    return Math.max(0.1, Math.min(200, minute - 0.1));
-  });
-  await page
-    .locator(".time-axis-area")
-    .click({ position: { x: 30, y: safePastMinute } });
   const dimensions = await page
-    .locator(".activity-item")
+    .locator('[data-activity-id="1"]')
     .evaluate((element) => ({
       renderedHeight: element.getBoundingClientRect().height,
       declaredHeight: Number.parseFloat((element as HTMLElement).style.height),
@@ -45,7 +76,6 @@ test("mobile timeline fits and activity height matches its duration", async ({
 test("follows the system color scheme", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
-
   expect(
     await page.evaluate(() => ({
       prefersDark: matchMedia("(prefers-color-scheme: dark)").matches,
@@ -65,7 +95,6 @@ test("follows the system color scheme", async ({ page }) => {
     captureBackground: "rgb(32, 32, 32)",
     receiptBackground: "rgb(28, 28, 28)",
   });
-
   await page.emulateMedia({ colorScheme: "light" });
   await expect
     .poll(() =>
@@ -74,124 +103,63 @@ test("follows the system color scheme", async ({ page }) => {
     .toBe("rgb(255, 255, 255)");
 });
 
-test("create, rename, and persist an activity across reload", async ({
+test("configures tags, captures a combination, and persists it", async ({
   page,
 }) => {
-  const newName = "Smoke Test Activity";
-
-  // Deterministic start: clear any persisted state.
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-
-  // Create an activity by clicking the time axis at a guaranteed past time.
-  const safePastMinute = await page.evaluate(() => {
-    const now = new Date();
-    const minute =
-      now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
-    return Math.max(0.1, Math.min(200, minute - 0.1));
-  });
-  await page
-    .locator(".time-axis-area")
-    .click({ position: { x: 30, y: safePastMinute } });
-  // Fresh store: the first created activity gets id 1.
-  const item = page.locator('[data-activity-id="1"]');
-  await expect(item).toHaveText("New Activity");
-
-  // Rename: double-click to edit, replace the text, commit with Enter.
-  await item.dblclick();
-  await item.fill(newName);
-  await item.press("Enter");
-  await expect(item).toHaveText(newName);
-
-  // Reload and assert the rename survived (localStorage persistence).
+  await page.getByRole("link", { name: "Configure tags" }).click();
+  await expect(page).toHaveURL(/\/#\/tags$/);
   await page.reload();
-  await expect(page.locator('[data-activity-id="1"]')).toHaveText(newName);
-});
-
-test("one-tap capture transitions, stops, and undoes", async ({ page }) => {
-  await page.goto("/");
-  await page.evaluate(() => {
-    const today = new Date();
-    const date = [
-      today.getFullYear(),
-      String(today.getMonth() + 1).padStart(2, "0"),
-      String(today.getDate()).padStart(2, "0"),
-    ].join("-");
-    localStorage.setItem(
-      "activity",
-      JSON.stringify({
-        activities: [
-          {
-            id: 1,
-            name: "Focus",
-            start_time_minutes: 0,
-            duration_minutes: 1,
-            date,
-          },
-        ],
-        nextId: 2,
-        runningActivity: null,
-        lastCaptureUndo: null,
-      }),
-    );
-  });
-  await page.reload();
-
+  await expect(page.getByRole("heading", { name: "Tags" })).toBeVisible();
+  await page.getByLabel("Group name", { exact: true }).fill("Work");
+  await page.getByLabel("Initial tag", { exact: true }).fill("Focus");
+  await page.getByRole("button", { name: "Create group" }).click();
+  await page.getByRole("link", { name: "Today", exact: true }).click();
+  await expect(page).toHaveURL(/\/#\/$/);
   await page.getByRole("button", { name: "Focus", exact: true }).click();
+  await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.locator(".capture-current")).toContainText("Focus");
-  await expect(
-    page.getByRole("button", { name: "Focus", exact: true }),
-  ).toHaveCount(0);
-
-  await page.getByLabel("Other").fill("Meeting");
-  await page.getByLabel("Other").press("Enter");
-  await expect(page.locator(".capture-current")).toContainText("Meeting");
-
-  await page.getByRole("button", { name: "Stop", exact: true }).click();
-  await expect(page.locator(".capture-current")).toContainText("Not tracking");
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(page.locator(".capture-current")).toContainText("Meeting");
+  await page.reload();
+  await expect(page.locator(".capture-current")).toContainText("Focus");
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key) !== null, storeKey),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => localStorage.getItem("activity")),
+  ).toBeNull();
 });
 
-test("populated capture controls fit a mobile viewport with long names", async ({
-  page,
-}) => {
+test("long tag combinations fit a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  const base = stateForToday();
+  const longName = "Extremely-long-unbroken-tag-name-".repeat(4);
+  const persisted = {
+    ...base,
+    activities: [
+      { ...base.activities[0], tagIds: ["long"] },
+      base.activities[1],
+    ],
+    runningActivity: {
+      tagIds: ["long", "meeting"],
+      startedAtMs: Date.now() - 60_000,
+    },
+    tagGroups: [
+      {
+        ...base.tagGroups[0],
+        tags: [{ id: "long", name: longName }, base.tagGroups[0].tags[1]],
+      },
+    ],
+  };
   await page.goto("/");
-  await page.evaluate(() => {
-    const now = new Date();
-    const date = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0"),
-    ].join("-");
-    localStorage.setItem(
-      "activity",
-      JSON.stringify({
-        activities: [
-          {
-            id: 1,
-            name: "Extremely-long-unbroken-activity-name-".repeat(4),
-            start_time_minutes: 0,
-            duration_minutes: 1,
-            date,
-          },
-        ],
-        nextId: 2,
-        runningActivity: {
-          name: "Another-extremely-long-current-activity-name-".repeat(4),
-          startedAtMs: Date.now() - 60_000,
-        },
-        lastCaptureUndo: null,
-      }),
-    );
-  });
+  await page.evaluate(
+    ({ key, state }) => localStorage.setItem(key, JSON.stringify(state)),
+    { key: storeKey, state: persisted },
+  );
   await page.reload();
 
-  await expect(
-    page.getByText("Recent activities", { exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".capture-current")).toContainText(longName);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -199,44 +167,37 @@ test("populated capture controls fit a mobile viewport with long names", async (
   ).toBe(true);
 });
 
+test("archived tags leave historical display but disappear from capture", async ({
+  page,
+}) => {
+  const state = stateForToday();
+  state.tagGroups[0].tags[0] = {
+    ...state.tagGroups[0].tags[0],
+    archived: true,
+  } as (typeof state.tagGroups)[0]["tags"][number];
+  await page.goto("/");
+  await page.evaluate(
+    ({ key, persisted }) =>
+      localStorage.setItem(key, JSON.stringify(persisted)),
+    { key: storeKey, persisted: state },
+  );
+  await page.reload();
+  await expect(page.locator('[data-activity-id="1"]')).toHaveText("Focus");
+  await expect(
+    page.getByRole("button", { name: "Focus", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".tag-total-group")).toContainText("Focus");
+});
+
 test("dragging the broad closed activity surface still shifts its trailing boundary", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.evaluate(() => {
-    const today = new Date();
-    const date = [
-      today.getFullYear(),
-      String(today.getMonth() + 1).padStart(2, "0"),
-      String(today.getDate()).padStart(2, "0"),
-    ].join("-");
-    localStorage.setItem(
-      "activity",
-      JSON.stringify({
-        activities: [
-          {
-            id: 1,
-            name: "First",
-            start_time_minutes: 60,
-            duration_minutes: 60,
-            date,
-          },
-          {
-            id: 2,
-            name: "Second",
-            start_time_minutes: 120,
-            duration_minutes: 60,
-            date,
-          },
-        ],
-        nextId: 3,
-        runningActivity: null,
-        lastCaptureUndo: null,
-      }),
-    );
-  });
+  await page.evaluate(
+    ({ key, state }) => localStorage.setItem(key, JSON.stringify(state)),
+    { key: storeKey, state: stateForToday() },
+  );
   await page.reload();
-
   const first = page.locator('[data-activity-id="1"]');
   await first.scrollIntoViewIfNeeded();
   const box = await first.boundingBox();
@@ -245,18 +206,17 @@ test("dragging the broad closed activity surface still shifts its trailing bound
   await page.mouse.down();
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2 + 30);
   await page.mouse.up();
-
   await expect
     .poll(() =>
-      page.evaluate(() => {
-        const state = JSON.parse(localStorage.getItem("activity")!);
+      page.evaluate((key) => {
+        const state = JSON.parse(localStorage.getItem(key)!);
         return state.activities.map(
           (activity: {
             duration_minutes: number;
             start_time_minutes: number;
           }) => [activity.duration_minutes, activity.start_time_minutes],
         );
-      }),
+      }, storeKey),
     )
     .toEqual([
       [90, 60],

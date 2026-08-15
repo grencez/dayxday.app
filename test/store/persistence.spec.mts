@@ -1,57 +1,54 @@
 import "jsdom-global";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { createPinia } from "pinia";
+import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import App from "../../src/App.vue";
-import { useActivityStore } from "../../src/store/activity";
-import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import router from "../../src/router.mts";
+import { useActivityStore } from "../../src/store/activity";
 
 function mountPersistedApp(): VueWrapper {
   const pinia = createPinia();
   pinia.use(piniaPluginPersistedstate);
-  return mount(App, {
-    global: {
-      plugins: [pinia, router],
-    },
-  });
+  return mount(App, { global: { plugins: [pinia, router] } });
 }
 
-describe("activity persistence", () => {
+describe("structured state persistence", () => {
   let wrappers: VueWrapper[] = [];
-
   beforeEach(() => {
-    window.localStorage.clear();
+    localStorage.clear();
     wrappers = [];
   });
+  afterEach(() => wrappers.forEach((wrapper) => wrapper.unmount()));
 
-  afterEach(() => {
-    wrappers.forEach((wrapper) => wrapper.unmount());
-  });
-
-  it("reloads closed activities, running capture, and guarded undo", async () => {
+  it("uses a fresh key and reloads config, activities, running, and cloned undo", async () => {
+    localStorage.setItem(
+      "activity",
+      JSON.stringify({ activities: [{ name: "legacy" }] }),
+    );
     wrappers.push(mountPersistedApp());
-    const firstStore = useActivityStore();
-    const nowMs = Date.now();
-
-    firstStore.transitionTo("Focus", nowMs - 60_000);
-    firstStore.transitionTo("Meeting", nowMs);
-    expect(firstStore.activities).toHaveLength(1);
-    expect(firstStore.canUndoLastTransition).toBe(true);
+    const first = useActivityStore();
+    expect(first.activities).toEqual([]);
+    first.createGroup("Work", "Focus");
+    first.addTag(first.tagGroups[0].id, "Meeting");
+    const [focus, meeting] = first.tagGroups[0].tags;
+    const now = Date.now();
+    first.transitionTo([focus.id], now - 60_000);
+    first.transitionTo([meeting.id], now);
+    await nextTick();
+    expect(localStorage.getItem("dayxday-structured-tags-v1")).not.toBeNull();
 
     wrappers.pop()!.unmount();
     await nextTick();
-
     wrappers.push(mountPersistedApp());
-    const reloadedStore = useActivityStore();
-
-    expect(reloadedStore.activities).toHaveLength(1);
-    expect(reloadedStore.activities[0].name).toBe("Focus");
-    expect(reloadedStore.runningActivity).toEqual({
-      name: "Meeting",
-      startedAtMs: nowMs,
-    });
-    expect(reloadedStore.canUndoLastTransition).toBe(true);
+    const reloaded = useActivityStore();
+    expect(reloaded.tagGroups[0].tags.map((tag) => tag.name)).toEqual([
+      "Focus",
+      "Meeting",
+    ]);
+    expect(reloaded.activities[0].tagIds).toEqual([focus.id]);
+    expect(reloaded.runningActivity?.tagIds).toEqual([meeting.id]);
+    expect(reloaded.canUndoLastTransition).toBe(true);
   });
 });

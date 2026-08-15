@@ -4,123 +4,141 @@ import {
   formatReceiptClock,
   formatReceiptDuration,
 } from "@/function/buildTodayReceipt";
+import type { TagGroup } from "@/function/tagSelection";
 import type { Activity } from "@/store/activity";
 
 const day = "2024-05-10";
-
-function at(hour: number, minute = 0): number {
-  return new Date(2024, 4, 10, hour, minute).getTime();
-}
-
-function activity(
+const tagGroups: TagGroup[] = [
+  {
+    id: "place",
+    name: "Place",
+    tags: [
+      { id: "office", name: "Office" },
+      { id: "home", name: "Home" },
+    ],
+  },
+  {
+    id: "work",
+    name: "Work",
+    tags: [
+      { id: "focus", name: "Focus" },
+      { id: "old", name: "Old work", archived: true },
+    ],
+  },
+];
+const at = (hour: number, minute = 0) =>
+  new Date(2024, 4, 10, hour, minute).getTime();
+const activity = (
   id: number,
-  name: string,
+  tagIds: string[],
   start_time_minutes: number,
   duration_minutes: number,
-): Activity {
-  return {
-    id,
-    name,
-    start_time_minutes,
-    duration_minutes,
-    date: day,
-  };
-}
+): Activity => ({
+  id,
+  tagIds,
+  start_time_minutes,
+  duration_minutes,
+  date: day,
+});
 
 describe("buildTodayReceipt", () => {
-  it("sorts segments, clips them at now, and aggregates repeated names", () => {
+  it("shows canonical segment titles and per-tag totals grouped in config order", () => {
     const receipt = buildTodayReceipt({
       day,
       nowMs: at(12),
+      tagGroups,
       runningActivity: null,
       activities: [
-        activity(2, "Break", 10 * 60 + 30, 30),
-        activity(3, "Focus", 11 * 60 + 30, 60),
-        activity(1, "Focus", 9 * 60, 60),
+        activity(2, ["focus", "office"], 10 * 60, 60),
+        activity(1, ["home", "focus"], 9 * 60, 60),
       ],
     });
-
-    expect(receipt.segments.map((segment) => segment.name)).toEqual([
-      "Focus",
-      "Break",
-      "Focus",
+    expect(receipt.segments.map((segment) => segment.title)).toEqual([
+      "Home · Focus",
+      "Office · Focus",
     ]);
-    expect(receipt.segments[2].durationMinutes).toBe(30);
-    expect(receipt.totals).toEqual([
-      { name: "Focus", minutes: 90 },
-      { name: "Break", minutes: 30 },
+    expect(receipt.groupedTotals).toEqual([
+      {
+        id: "place",
+        name: "Place",
+        tags: [
+          { id: "office", name: "Office", minutes: 60 },
+          { id: "home", name: "Home", minutes: 60 },
+        ],
+      },
+      {
+        id: "work",
+        name: "Work",
+        tags: [{ id: "focus", name: "Focus", minutes: 120 }],
+      },
     ]);
-    expect(receipt.trackedMinutes).toBe(120);
-    expect(receipt.untrackedMinutes).toBe(600);
-    expect(receipt.coveragePercent).toBeCloseTo(100 / 6);
   });
 
-  it("counts the current activity only through now without persisting it", () => {
-    const runningActivity = {
-      name: "Planning",
-      startedAtMs: at(10, 15),
-    };
+  it("includes archived tags used by history and the running segment", () => {
     const receipt = buildTodayReceipt({
       day,
-      nowMs: at(10, 45),
-      runningActivity,
-      activities: [],
+      nowMs: at(11),
+      tagGroups,
+      activities: [activity(1, ["old"], 9 * 60, 30)],
+      runningActivity: { tagIds: ["office", "focus"], startedAtMs: at(10, 30) },
     });
-
-    expect(receipt.segments).toHaveLength(1);
-    expect(receipt.segments[0]).toMatchObject({
-      name: "Planning",
+    expect(receipt.segments[0].title).toBe("Old work");
+    expect(receipt.segments[1]).toMatchObject({
+      title: "Office · Focus",
       durationMinutes: 30,
       ongoing: true,
     });
-    expect(receipt.totals).toEqual([{ name: "Planning", minutes: 30 }]);
-    expect(runningActivity).toEqual({
-      name: "Planning",
-      startedAtMs: at(10, 15),
-    });
+    expect(receipt.groupedTotals[1].tags).toEqual([
+      { id: "focus", name: "Focus", minutes: 30 },
+      { id: "old", name: "Old work", minutes: 30 },
+    ]);
   });
 
-  it("uses interval union for coverage when activities overlap", () => {
+  it("unions overlaps per tag while allowing totals for different tags to overlap", () => {
     const receipt = buildTodayReceipt({
       day,
       nowMs: at(5),
+      tagGroups,
       runningActivity: null,
       activities: [
-        activity(1, "Focus", 60, 120),
-        activity(2, "Meeting", 120, 120),
+        activity(1, ["office", "focus"], 60, 120),
+        activity(2, ["home", "focus"], 120, 120),
       ],
     });
-
-    expect(receipt.totals).toEqual([
-      { name: "Focus", minutes: 120 },
-      { name: "Meeting", minutes: 120 },
-    ]);
     expect(receipt.trackedMinutes).toBe(180);
     expect(receipt.untrackedMinutes).toBe(120);
-    expect(receipt.coveragePercent).toBe(60);
+    expect(receipt.groupedTotals[0].tags).toEqual([
+      { id: "office", name: "Office", minutes: 120 },
+      { id: "home", name: "Home", minutes: 120 },
+    ]);
+    expect(receipt.groupedTotals[1].tags[0]).toEqual({
+      id: "focus",
+      name: "Focus",
+      minutes: 180,
+    });
   });
 
-  it("ignores invalid and future segments", () => {
+  it("clips at now and ignores empty, unknown, and invalid timing", () => {
     const receipt = buildTodayReceipt({
       day,
       nowMs: at(8),
+      tagGroups,
       runningActivity: null,
       activities: [
-        activity(1, "Future", 9 * 60, 60),
-        activity(2, "Zero", 7 * 60, 0),
-        activity(3, "Invalid", Number.NaN, 30),
+        activity(1, ["focus"], 7 * 60 + 30, 60),
+        activity(2, [], 60, 30),
+        activity(3, ["unknown"], 120, 30),
+        activity(4, ["focus"], Number.NaN, 30),
       ],
     });
-
-    expect(receipt.segments).toEqual([]);
-    expect(receipt.trackedMinutes).toBe(0);
-    expect(receipt.untrackedMinutes).toBe(480);
+    expect(receipt.segments).toHaveLength(1);
+    expect(receipt.segments[0].durationMinutes).toBe(30);
+    expect(receipt.trackedMinutes).toBe(30);
   });
 });
 
 describe("receipt formatting", () => {
-  it("formats durations and local clock times compactly", () => {
-    expect(formatReceiptDuration(0)).toBe("0m");
+  it("formats durations and clocks", () => {
     expect(formatReceiptDuration(0.5)).toBe("<1m");
     expect(formatReceiptDuration(65)).toBe("1h 5m");
     expect(formatReceiptClock(at(9, 5))).toBe("09:05");

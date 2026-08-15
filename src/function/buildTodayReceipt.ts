@@ -1,23 +1,32 @@
 import { getLocalDayAtMs } from "./localCalendar";
+import { canonicalTagIds, selectionTitle, type TagGroup } from "./tagSelection";
 import type { Activity, RunningActivity } from "../store/activity";
 
 export interface ReceiptSegment {
   key: string;
-  name: string;
+  tagIds: string[];
+  title: string;
   startMs: number;
   endMs: number;
   durationMinutes: number;
   ongoing: boolean;
 }
 
-export interface ReceiptTotal {
+export interface ReceiptTagTotal {
+  id: string;
   name: string;
   minutes: number;
 }
 
+export interface ReceiptGroupTotal {
+  id: string;
+  name: string;
+  tags: ReceiptTagTotal[];
+}
+
 export interface TodayReceipt {
   segments: ReceiptSegment[];
-  totals: ReceiptTotal[];
+  groupedTotals: ReceiptGroupTotal[];
   elapsedMinutes: number;
   trackedMinutes: number;
   untrackedMinutes: number;
@@ -27,6 +36,7 @@ export interface TodayReceipt {
 interface TodayReceiptInput {
   activities: Activity[];
   runningActivity: RunningActivity | null;
+  tagGroups: TagGroup[];
   day: string;
   nowMs: number;
 }
@@ -39,18 +49,26 @@ interface DayBounds {
   endMs: number;
 }
 
+function emptyReceipt(): TodayReceipt {
+  return {
+    segments: [],
+    groupedTotals: [],
+    elapsedMinutes: 0,
+    trackedMinutes: 0,
+    untrackedMinutes: 0,
+    coveragePercent: 0,
+  };
+}
+
 function getDayBounds(day: string): DayBounds | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
   if (match === null) return null;
-
   const year = Number(match[1]);
   const monthIndex = Number(match[2]) - 1;
   const dayOfMonth = Number(match[3]);
   const startMs = new Date(year, monthIndex, dayOfMonth).getTime();
-  if (!Number.isFinite(startMs) || getLocalDayAtMs(startMs) !== day) {
+  if (!Number.isFinite(startMs) || getLocalDayAtMs(startMs) !== day)
     return null;
-  }
-
   return {
     year,
     monthIndex,
@@ -74,58 +92,66 @@ function getActivityStartMs(bounds: DayBounds, startMinutes: number): number {
   ).getTime();
 }
 
-function normalizeName(name: unknown): string {
-  if (typeof name !== "string") return "Unnamed activity";
-  return name.trim() || "Unnamed activity";
+interface ReceiptInterval {
+  startMs: number;
+  endMs: number;
 }
 
-function mergeTrackedMinutes(segments: ReceiptSegment[]): number {
-  if (segments.length === 0) return 0;
-
-  const intervals = segments
-    .map(({ startMs, endMs }) => ({ startMs, endMs }))
-    .sort((left, right) => left.startMs - right.startMs);
+function mergeIntervalMinutes(intervals: ReceiptInterval[]): number {
+  if (intervals.length === 0) return 0;
+  const ordered = [...intervals].sort(
+    (left, right) => left.startMs - right.startMs,
+  );
   let trackedMs = 0;
-  let currentStart = intervals[0].startMs;
-  let currentEnd = intervals[0].endMs;
-
-  for (const interval of intervals.slice(1)) {
-    if (interval.startMs <= currentEnd) {
+  let currentStart = ordered[0].startMs;
+  let currentEnd = ordered[0].endMs;
+  for (const interval of ordered.slice(1)) {
+    if (interval.startMs <= currentEnd)
       currentEnd = Math.max(currentEnd, interval.endMs);
-    } else {
+    else {
       trackedMs += currentEnd - currentStart;
       currentStart = interval.startMs;
       currentEnd = interval.endMs;
     }
   }
-  trackedMs += currentEnd - currentStart;
-  return trackedMs / 60_000;
+  return (trackedMs + currentEnd - currentStart) / 60_000;
 }
 
 export function buildTodayReceipt({
   activities,
   runningActivity,
+  tagGroups,
   day,
   nowMs,
 }: TodayReceiptInput): TodayReceipt {
   const bounds = getDayBounds(day);
-  if (bounds === null) {
-    return {
-      segments: [],
-      totals: [],
-      elapsedMinutes: 0,
-      trackedMinutes: 0,
-      untrackedMinutes: 0,
-      coveragePercent: 0,
-    };
-  }
-
+  if (bounds === null) return emptyReceipt();
   const safeNowMs = Number.isFinite(nowMs) ? nowMs : bounds.startMs;
   const receiptEndMs = Math.min(
     Math.max(safeNowMs, bounds.startMs),
     bounds.endMs,
   );
   const segments: ReceiptSegment[] = [];
+
+  const addSegment = (
+    key: string,
+    rawTagIds: readonly string[],
+    startMs: number,
+    endMs: number,
+    ongoing: boolean,
+  ) => {
+    const tagIds = canonicalTagIds(rawTagIds, tagGroups);
+    if (tagIds.length === 0 || endMs <= startMs) return;
+    segments.push({
+      key,
+      tagIds,
+      title: selectionTitle(tagIds, tagGroups),
+      startMs,
+      endMs,
+      durationMinutes: (endMs - startMs) / 60_000,
+      ongoing,
+    });
+  };
 
   for (const activity of activities) {
     if (
@@ -135,24 +161,17 @@ export function buildTodayReceipt({
       activity.start_time_minutes < 0 ||
       activity.start_time_minutes > 1440 ||
       activity.duration_minutes <= 0
-    ) {
+    )
       continue;
-    }
-
     const rawStartMs = getActivityStartMs(bounds, activity.start_time_minutes);
     const rawEndMs = rawStartMs + activity.duration_minutes * 60_000;
-    const startMs = Math.max(rawStartMs, bounds.startMs);
-    const endMs = Math.min(rawEndMs, receiptEndMs, bounds.endMs);
-    if (endMs <= startMs) continue;
-
-    segments.push({
-      key: `activity:${activity.id}:${rawStartMs}`,
-      name: normalizeName(activity.name),
-      startMs,
-      endMs,
-      durationMinutes: (endMs - startMs) / 60_000,
-      ongoing: false,
-    });
+    addSegment(
+      `activity:${activity.id}:${rawStartMs}`,
+      activity.tagIds,
+      Math.max(rawStartMs, bounds.startMs),
+      Math.min(rawEndMs, receiptEndMs, bounds.endMs),
+      false,
+    );
   }
 
   if (
@@ -160,17 +179,13 @@ export function buildTodayReceipt({
     Number.isFinite(runningActivity.startedAtMs) &&
     getLocalDayAtMs(runningActivity.startedAtMs) === day
   ) {
-    const startMs = Math.max(runningActivity.startedAtMs, bounds.startMs);
-    if (startMs < receiptEndMs) {
-      segments.push({
-        key: `running:${runningActivity.startedAtMs}`,
-        name: normalizeName(runningActivity.name),
-        startMs,
-        endMs: receiptEndMs,
-        durationMinutes: (receiptEndMs - startMs) / 60_000,
-        ongoing: true,
-      });
-    }
+    addSegment(
+      `running:${runningActivity.startedAtMs}`,
+      runningActivity.tagIds,
+      Math.max(runningActivity.startedAtMs, bounds.startMs),
+      receiptEndMs,
+      true,
+    );
   }
 
   segments.sort(
@@ -180,32 +195,39 @@ export function buildTodayReceipt({
       left.key.localeCompare(right.key),
   );
 
-  const totalsByName = new Map<string, number>();
+  const intervalsByTag = new Map<string, ReceiptInterval[]>();
   for (const segment of segments) {
-    totalsByName.set(
-      segment.name,
-      (totalsByName.get(segment.name) ?? 0) + segment.durationMinutes,
-    );
+    for (const tagId of segment.tagIds) {
+      const intervals = intervalsByTag.get(tagId) ?? [];
+      intervals.push({ startMs: segment.startMs, endMs: segment.endMs });
+      intervalsByTag.set(tagId, intervals);
+    }
   }
-  const totals = [...totalsByName.entries()]
-    .map(([name, minutes]) => ({ name, minutes }))
-    .sort(
-      (left, right) =>
-        right.minutes - left.minutes || left.name.localeCompare(right.name),
-    );
+  const groupedTotals = tagGroups
+    .map((group) => ({
+      id: group.id,
+      name: group.name,
+      tags: group.tags
+        .filter((tag) => intervalsByTag.has(tag.id))
+        .map((tag) => ({
+          id: tag.id,
+          name: tag.name,
+          minutes: mergeIntervalMinutes(intervalsByTag.get(tag.id)!),
+        })),
+    }))
+    .filter((group) => group.tags.length > 0);
 
   const elapsedMinutes = (receiptEndMs - bounds.startMs) / 60_000;
   const trackedMinutes = Math.min(
     elapsedMinutes,
-    mergeTrackedMinutes(segments),
+    mergeIntervalMinutes(segments),
   );
   const untrackedMinutes = Math.max(0, elapsedMinutes - trackedMinutes);
   const coveragePercent =
     elapsedMinutes === 0 ? 0 : (trackedMinutes / elapsedMinutes) * 100;
-
   return {
     segments,
-    totals,
+    groupedTotals,
     elapsedMinutes,
     trackedMinutes,
     untrackedMinutes,
@@ -216,7 +238,6 @@ export function buildTodayReceipt({
 export function formatReceiptDuration(minutes: number): string {
   if (!Number.isFinite(minutes) || minutes <= 0) return "0m";
   if (minutes < 1) return "<1m";
-
   const roundedMinutes = Math.round(minutes);
   const hours = Math.floor(roundedMinutes / 60);
   const remainingMinutes = roundedMinutes % 60;

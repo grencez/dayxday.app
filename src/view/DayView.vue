@@ -3,11 +3,7 @@
     <h1>Day View</h1>
     <CapturePanel :now-ms="nowMs" />
     <TodayReceipt :receipt="todayReceipt" />
-    <div
-      ref="timeAxisAreaRef"
-      class="time-axis-area"
-      @click="handleTimeAxisAreaClick"
-    >
+    <div ref="timeAxisAreaRef" class="time-axis-area">
       <div
         v-for="hour in hours"
         :key="hour"
@@ -26,19 +22,18 @@
           Your current activity will appear here when it ends.
         </template>
         <template v-else>
-          Start an activity above, or tap the timeline on the left to
-          reconstruct past time.
+          Select at least one tag above to start tracking.
         </template>
       </p>
       <template v-for="(activity, index) in activities" :key="activity.id">
         <ActivityItem
           :activity="activity"
+          :title="activityStore.titleForSelection(activity.tagIds)"
           class="activity-item"
           :style="{
             top: activity.start_time_minutes + 'px',
             height: activity.duration_minutes + 'px',
           }"
-          @rename="handleRename"
         />
         <div
           v-if="index < activities.length - 1"
@@ -58,31 +53,23 @@
 </template>
 
 <script lang="ts">
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useDragAndDrop } from "../composable/useDragAndDrop";
+import { useTimeFormatter } from "../composable/useTimeFormatter";
+import { buildTodayReceipt } from "../function/buildTodayReceipt";
+import { getLocalDayAtMs } from "../function/localCalendar";
 import { useActivityStore } from "../store/activity";
-import { ref, computed, onMounted, onUnmounted } from "vue";
 import ActivityItem from "../component/ActivityItem.vue";
 import CapturePanel from "../component/CapturePanel.vue";
 import TodayReceipt from "../component/TodayReceipt.vue";
-import { useTimeFormatter } from "../composable/useTimeFormatter";
-import { buildTodayReceipt } from "../function/buildTodayReceipt";
-import {
-  getLocalDayAtMs,
-  getLocalMinuteOfDay,
-} from "../function/localCalendar";
 
 export default {
   name: "DayView",
-  components: {
-    ActivityItem,
-    CapturePanel,
-    TodayReceipt,
-  },
+  components: { ActivityItem, CapturePanel, TodayReceipt },
   setup() {
     const activityStore = useActivityStore();
     const nowMs = ref(Date.now());
     const currentDate = computed(() => getLocalDayAtMs(nowMs.value));
-
     activityStore.reconcileRunning(nowMs.value);
     useDragAndDrop(currentDate);
 
@@ -93,57 +80,30 @@ export default {
       buildTodayReceipt({
         activities: activities.value,
         runningActivity: activityStore.runningActivity,
+        tagGroups: activityStore.tagGroups,
         day: currentDate.value,
         nowMs: nowMs.value,
       }),
     );
-
     const timeAxisAreaRef = ref<HTMLElement | null>(null);
-
-    const handleRename = (payload: { id: number; name: string }) => {
-      activityStore.updateActivity(payload.id, { name: payload.name });
-    };
-
-    // Include 24 to show the final 00:00
-    const hours = Array.from({ length: 25 }, (_, i) => i);
-
+    const hours = Array.from({ length: 25 }, (_, index) => index);
     let reconcileTimer: ReturnType<typeof setInterval> | undefined;
     const updateNowAndReconcile = () => {
       nowMs.value = Date.now();
       activityStore.reconcileRunning(nowMs.value);
     };
-
     onMounted(() => {
       reconcileTimer = setInterval(updateNowAndReconcile, 1000);
     });
-
     onUnmounted(() => {
       if (reconcileTimer !== undefined) clearInterval(reconcileTimer);
     });
-
-    const handleTimeAxisAreaClick = (event: MouseEvent) => {
-      if (!timeAxisAreaRef.value) {
-        return;
-      }
-      const rect = timeAxisAreaRef.value.getBoundingClientRect();
-      const y = event.clientY - rect.top;
-      const timeInMinutes = Math.round((y / rect.height) * 1440);
-      activityStore.insertActivityAtTime(
-        timeInMinutes,
-        currentDate.value,
-        { name: "New Activity" },
-        Math.min(1440, getLocalMinuteOfDay(new Date(nowMs.value))),
-      );
-    };
-
     return {
       activityStore,
       activities,
       hours,
       useTimeFormatter,
-      handleTimeAxisAreaClick,
       timeAxisAreaRef,
-      handleRename,
       nowMs,
       currentDate,
       todayReceipt,
@@ -161,53 +121,44 @@ export default {
   max-width: 1200px;
   width: 100%;
 }
-
 .day-view h1 {
   margin-bottom: 10px;
-  grid-column: 1 / 3; /* Span the title across both columns */
+  grid-column: 1 / 3;
 }
-
 .time-axis-area {
-  position: relative; /* Make this relative */
+  position: relative;
   margin-right: 10px;
-  cursor: pointer;
 }
-
 .time-axis-mark {
-  position: absolute; /* Position absolutely within time-markers */
+  position: absolute;
   left: 0;
   display: flex;
   align-items: center;
   height: 1px;
 }
-
 .time-text {
   font-size: 0.8em;
   white-space: nowrap;
   margin-right: 5px;
 }
-
 .tick-mark {
   width: 5px;
   height: 1px;
   background-color: var(--color-axis);
 }
-
 .activity-list {
-  position: relative; /* Make this relative */
+  position: relative;
   border: 1px solid var(--color-border);
   min-height: 1440px;
-  margin-top: 0px;
+  margin-top: 0;
   min-width: 0;
 }
-
 .empty-state {
   margin: 16px;
   color: var(--color-muted);
   line-height: 1.4;
   pointer-events: none;
 }
-
 .activity-border {
   position: absolute;
   left: 0;
@@ -215,6 +166,6 @@ export default {
   height: 10px;
   cursor: ns-resize;
   background-color: var(--color-drag-target);
-  touch-action: none; /* Disable touch actions to prevent context menu */
+  touch-action: none;
 }
 </style>

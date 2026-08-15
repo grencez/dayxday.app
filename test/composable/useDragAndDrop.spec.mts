@@ -37,21 +37,21 @@ describe("useDragAndDrop", () => {
     activities.value = [
       {
         id: 1,
-        name: "Activity A",
+        tagIds: ["tag-1"],
         start_time_minutes: 100,
         duration_minutes: 100,
         date: TEST_DATE,
       },
       {
         id: 2,
-        name: "Activity B",
+        tagIds: ["tag-1"],
         start_time_minutes: 200,
         duration_minutes: 100,
         date: TEST_DATE,
       },
       {
         id: 3,
-        name: "Activity C",
+        tagIds: ["tag-1"],
         start_time_minutes: 300,
         duration_minutes: 100,
         date: TEST_DATE,
@@ -61,7 +61,7 @@ describe("useDragAndDrop", () => {
       ...activities.value,
       {
         id: 4,
-        name: "Activity on second day",
+        tagIds: ["tag-1"],
         start_time_minutes: 400,
         duration_minutes: 100,
         date: SECOND_DATE,
