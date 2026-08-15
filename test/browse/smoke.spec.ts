@@ -73,6 +73,42 @@ test("mobile timeline fits and activity height matches duration", async ({
   ).toBeLessThan(0.02);
 });
 
+test("mobile tap edits a closed activity and persists after reload", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+  await page.evaluate(
+    ({ key, state }) => localStorage.setItem(key, JSON.stringify(state)),
+    { key: storeKey, state: stateForToday() },
+  );
+  await page.reload();
+
+  await page.locator('[data-activity-id="1"]').tap();
+  const editor = page.getByRole("dialog", { name: "Edit activity tags" });
+  await expect(editor).toBeVisible();
+  const choices = editor.locator(".tag-choices");
+  await choices.getByRole("button", { name: "Focus", exact: true }).tap();
+  await choices.getByRole("button", { name: "Meeting", exact: true }).tap();
+  await editor.getByRole("button", { name: "Save", exact: true }).tap();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator('[data-activity-id="1"]')).toHaveText("Meeting");
+
+  await page.reload();
+  await expect(page.locator('[data-activity-id="1"]')).toHaveText("Meeting");
+  expect(
+    await page.evaluate((key) => {
+      const state = JSON.parse(localStorage.getItem(key)!);
+      return state.activities[0].tagIds;
+    }, storeKey),
+  ).toEqual(["meeting"]);
+  await context.close();
+});
+
 test("follows the system color scheme", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");

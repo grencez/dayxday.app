@@ -15,6 +15,8 @@
   --color-warning: #664d03;
   --color-warning-background: #fff3cd;
   --color-warning-border: #ffe69c;
+  --color-modal-backdrop: rgba(0, 0, 0, 0.48);
+  --shadow-modal: 0 18px 50px rgba(0, 0, 0, 0.24);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,6 +36,8 @@
     --color-warning: #ffe5a3;
     --color-warning-background: #3d3214;
     --color-warning-border: #67571f;
+    --color-modal-backdrop: rgba(0, 0, 0, 0.7);
+    --shadow-modal: 0 18px 50px rgba(0, 0, 0, 0.55);
   }
 }
 

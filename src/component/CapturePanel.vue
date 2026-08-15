@@ -21,43 +21,14 @@
     </div>
 
     <template v-if="activityStore.activeTagGroups.length">
-      <div class="tag-choices">
-        <fieldset
-          v-for="group in activityStore.activeTagGroups"
-          :key="group.id"
-        >
-          <legend>
-            {{ group.name }}<span v-if="group.exclusive"> (choose one)</span>
-          </legend>
-          <button
-            v-for="tag in group.tags"
-            :key="tag.id"
-            type="button"
-            class="tag-toggle"
-            :class="{ selected: selectedTagIds.includes(tag.id) }"
-            :aria-pressed="selectedTagIds.includes(tag.id)"
-            @click="toggleTag(group.id, tag.id)"
-          >
-            {{ tag.name }}
-          </button>
-        </fieldset>
-      </div>
-
-      <fieldset
-        v-if="activityStore.recentTagSelections.length"
-        class="capture-recent"
-      >
-        <legend>Recent combinations</legend>
-        <button
-          v-for="tagIds in activityStore.recentTagSelections"
-          :key="selectionKey(tagIds)"
-          type="button"
-          class="recent-activity-button"
-          @click="useRecent(tagIds)"
-        >
-          {{ activityStore.titleForSelection(tagIds) }}
-        </button>
-      </fieldset>
+      <TagPicker
+        v-model:selected-tag-ids="selectedTagIds"
+        :tag-groups="activityStore.tagGroups"
+        :recent-tag-selections="activityStore.recentTagSelections"
+        :title-for-selection="activityStore.titleForSelection"
+        recent-class="capture-recent"
+        @select-recent="useRecent"
+      />
     </template>
 
     <div v-else class="capture-empty">
@@ -96,12 +67,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import {
-  isValidSelection,
-  normalizeSelection,
-  selectionKey,
-} from "../function/tagSelection";
+import { isValidSelection, normalizeSelection } from "../function/tagSelection";
 import { useActivityStore } from "../store/activity";
+import TagPicker from "./TagPicker.vue";
 
 const props = defineProps<{ nowMs: number }>();
 const activityStore = useActivityStore();
@@ -141,23 +109,6 @@ const elapsed = computed(() => {
     .join(":");
 });
 
-function toggleTag(groupId: string, tagId: string) {
-  const group = activityStore.tagGroups.find(
-    (candidate) => candidate.id === groupId,
-  );
-  if (!group) return;
-  const selected = new Set(selectedTagIds.value);
-  if (selected.has(tagId)) {
-    selected.delete(tagId);
-  } else {
-    if (group.exclusive) {
-      for (const tag of group.tags) selected.delete(tag.id);
-    }
-    selected.add(tagId);
-  }
-  selectedTagIds.value = [...selected];
-}
-
 function useRecent(tagIds: string[]) {
   selectedTagIds.value = [...tagIds];
   activityStore.transitionTo(tagIds, props.nowMs);
@@ -179,7 +130,6 @@ function useRecent(tagIds: string[]) {
 
 .capture-current,
 .capture-actions,
-.capture-recent,
 .capture-empty {
   display: flex;
   align-items: center;
@@ -197,30 +147,6 @@ function useRecent(tagIds: string[]) {
 }
 .capture-elapsed {
   font-variant-numeric: tabular-nums;
-}
-
-.tag-choices {
-  display: grid;
-  gap: 8px;
-}
-.tag-choices fieldset,
-.capture-recent {
-  padding: 0;
-  margin: 0;
-  border: 0;
-}
-.tag-choices legend,
-.capture-recent legend {
-  width: 100%;
-  margin-bottom: 6px;
-  font-size: 0.85em;
-  color: var(--color-muted);
-}
-.tag-toggle {
-  margin: 0 6px 6px 0;
-}
-.tag-toggle.selected {
-  outline: 2px solid var(--color-current);
 }
 
 .capture-panel button,

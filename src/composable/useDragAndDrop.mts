@@ -4,8 +4,21 @@ import { calculateSnappedY } from "../function/calculateSnappedY";
 import { isMouseInTimeAxisArea } from "../function/isMouseInTimeAxisArea";
 import { updateActivityElementStyle } from "../function/updateActivityElementStyle";
 
+const DRAG_THRESHOLD_PX = 6;
+
+function pointerPosition(event: MouseEvent | TouchEvent) {
+  if (event instanceof MouseEvent) {
+    return { x: event.clientX, y: event.clientY };
+  }
+  const touch = event.touches[0] ?? event.changedTouches[0];
+  return touch ? { x: touch.clientX, y: touch.clientY } : null;
+}
+
 // Main Composable
-export function useDragAndDrop(date: Ref<string>) {
+export function useDragAndDrop(
+  date: Ref<string>,
+  onActivityTap?: (activityId: number) => void,
+) {
   const activityStore = useActivityStore();
   const isDragging = ref(false);
 
@@ -20,7 +33,13 @@ export function useDragAndDrop(date: Ref<string>) {
   let initialDurationA = 0;
   let initialDurationB = 0;
 
-  let mouse_orig_screen_y = 0;
+  let pointerOriginY = 0;
+  let exceededDragThreshold = false;
+  let originalTimings: Array<{
+    id: number;
+    start_time_minutes: number;
+    duration_minutes: number;
+  }> = [];
   let border_orig_screen_y = 0;
 
   // --- Event Handlers ---
@@ -34,14 +53,21 @@ export function useDragAndDrop(date: Ref<string>) {
     index: number,
     isBorder: boolean,
   ) => {
+    const position = pointerPosition(e);
+    if (!position) return;
     isDragging.value = true;
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     draggedItem = item as HTMLElement;
     draggedDate = date.value;
-    mouse_orig_screen_y =
-      (e as MouseEvent).clientY ||
-      ((e as TouchEvent).touches && (e as TouchEvent).touches[0].clientY) ||
-      0;
+    pointerOriginY = position.y;
+    exceededDragThreshold = false;
+    originalTimings = activityStore
+      .getActivitiesForDay(draggedDate)
+      .map(({ id, start_time_minutes, duration_minutes }) => ({
+        id,
+        start_time_minutes,
+        duration_minutes,
+      }));
 
     if (isBorder) {
       startBorderDrag(index);
@@ -98,10 +124,14 @@ export function useDragAndDrop(date: Ref<string>) {
   const moveDrag = (e: MouseEvent | TouchEvent) => {
     if (!draggedItem || !isDragging.value) return;
 
-    const mouse_curr_screen_y =
-      (e as MouseEvent).clientY ||
-      ((e as TouchEvent).touches && (e as TouchEvent).touches[0].clientY);
-    if (mouse_curr_screen_y === undefined) return;
+    const position = pointerPosition(e);
+    if (!position) return;
+    if (!exceededDragThreshold) {
+      if (Math.abs(position.y - pointerOriginY) < DRAG_THRESHOLD_PX) return;
+      exceededDragThreshold = true;
+    }
+    if (e.cancelable) e.preventDefault();
+    const mouse_curr_screen_y = position.y;
 
     const time_axis_area = document.querySelector(".time-axis-area");
     const time_axis_area_rect = time_axis_area?.getBoundingClientRect();
@@ -113,7 +143,7 @@ export function useDragAndDrop(date: Ref<string>) {
         time_axis_area_rect,
       );
     } else {
-      border_curr_screen_y += mouse_curr_screen_y - mouse_orig_screen_y;
+      border_curr_screen_y += mouse_curr_screen_y - pointerOriginY;
     }
 
     if (isResizingActivity && draggedActivityId !== null) {
@@ -127,16 +157,24 @@ export function useDragAndDrop(date: Ref<string>) {
   /**
    * Handles the end of the dragging process.
    */
-  const endDrag = () => {
+  const finishDrag = (allowTap: boolean) => {
     if (!isDragging.value) return;
 
     isDragging.value = false;
 
     if (draggedItem) {
-      if (isResizingActivity && draggedActivityId !== null) {
-        endActivityDrag();
-      } else if (isResizingBorder && draggedBorderIndex !== null) {
-        endBorderDrag();
+      const tappedActivityId =
+        allowTap && isResizingActivity && !exceededDragThreshold
+          ? draggedActivityId
+          : null;
+      if (!allowTap && exceededDragThreshold) {
+        rollbackDrag();
+      } else if (exceededDragThreshold) {
+        if (isResizingActivity && draggedActivityId !== null) {
+          endActivityDrag();
+        } else if (isResizingBorder && draggedBorderIndex !== null) {
+          endBorderDrag();
+        }
       }
 
       draggedItem.style.cursor = "move";
@@ -146,8 +184,29 @@ export function useDragAndDrop(date: Ref<string>) {
       draggedActivityId = null;
       draggedBorderIndex = null;
       draggedDate = null;
+      exceededDragThreshold = false;
+      originalTimings = [];
+      if (tappedActivityId !== null) onActivityTap?.(tappedActivityId);
     }
   };
+
+  const endDrag = () => finishDrag(true);
+  const cancelDrag = () => finishDrag(false);
+
+  function rollbackDrag() {
+    for (const timing of originalTimings) {
+      activityStore.updateActivity(timing.id, {
+        start_time_minutes: timing.start_time_minutes,
+        duration_minutes: timing.duration_minutes,
+      });
+    }
+    originalTimings.forEach((timing, index) =>
+      updateActivityElementStyle(index, {
+        top: timing.start_time_minutes,
+        height: timing.duration_minutes,
+      }),
+    );
+  }
 
   /**
    * Handles the end of activity dragging.
@@ -259,14 +318,15 @@ export function useDragAndDrop(date: Ref<string>) {
       if (activityList) {
         activityList.addEventListener("mousedown", handleMouseDown);
         activityList.addEventListener("touchstart", handleTouchStart, {
-          passive: true,
+          passive: false,
         });
       }
 
       window.addEventListener("mousemove", moveDrag);
-      window.addEventListener("touchmove", moveDrag, { passive: true });
+      window.addEventListener("touchmove", moveDrag, { passive: false });
       window.addEventListener("mouseup", endDrag);
       window.addEventListener("touchend", endDrag);
+      window.addEventListener("touchcancel", cancelDrag);
 
       const activities = activityStore.getActivitiesForDay(date.value);
       for (let i = 0; i < activities.length; i++) {
@@ -288,6 +348,7 @@ export function useDragAndDrop(date: Ref<string>) {
     window.removeEventListener("touchmove", moveDrag);
     window.removeEventListener("mouseup", endDrag);
     window.removeEventListener("touchend", endDrag);
+    window.removeEventListener("touchcancel", cancelDrag);
   });
 
   function handleMouseDown(e: MouseEvent) {

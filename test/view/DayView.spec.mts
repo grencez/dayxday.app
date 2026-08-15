@@ -48,6 +48,28 @@ describe("DayView", () => {
       wrapper.findAll(".activity-item").map((item) => item.text()),
     ).toEqual(["Focus", "Meeting"]);
     expect(wrapper.find("[contenteditable]").exists()).toBe(false);
+    expect(wrapper.get(".timeline-help").text()).toBe(
+      "Tap an activity to edit its tags. Drag it to adjust its end.",
+    );
+  });
+
+  it("opens the closed-activity editor on a surface tap", async () => {
+    const wrapper = mount(DayView, { attachTo: document.body });
+    await wrapper.vm.$nextTick();
+    const activity = wrapper.get('[data-activity-id="1"]');
+    await activity.trigger("mousedown", { clientX: 100, clientY: 90 });
+    window.dispatchEvent(
+      new MouseEvent("mouseup", { clientX: 100, clientY: 90 }),
+    );
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.get('[role="dialog"]').attributes("aria-labelledby")).toBe(
+      "activity-editor-title",
+    );
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      "Edit activity tags",
+    );
+    wrapper.unmount();
   });
 
   it("does not fabricate an activity when the timeline is clicked", async () => {

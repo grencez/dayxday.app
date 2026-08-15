@@ -3,6 +3,9 @@
     <h1>Day View</h1>
     <CapturePanel :now-ms="nowMs" />
     <TodayReceipt :receipt="todayReceipt" />
+    <p class="timeline-help">
+      Tap an activity to edit its tags. Drag it to adjust its end.
+    </p>
     <div ref="timeAxisAreaRef" class="time-axis-area">
       <div
         v-for="hour in hours"
@@ -34,6 +37,7 @@
             top: activity.start_time_minutes + 'px',
             height: activity.duration_minutes + 'px',
           }"
+          @edit="openActivityEditor"
         />
         <div
           v-if="index < activities.length - 1"
@@ -49,32 +53,71 @@
         ></div>
       </template>
     </div>
+    <ActivityTagEditor
+      v-if="editingActivity"
+      :key="editingActivity.id"
+      :activity="editingActivity"
+      @close="closeActivityEditor"
+    />
   </div>
 </template>
 
 <script lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import { useDragAndDrop } from "../composable/useDragAndDrop";
 import { useTimeFormatter } from "../composable/useTimeFormatter";
 import { buildTodayReceipt } from "../function/buildTodayReceipt";
 import { getLocalDayAtMs } from "../function/localCalendar";
 import { useActivityStore } from "../store/activity";
 import ActivityItem from "../component/ActivityItem.vue";
+import ActivityTagEditor from "../component/ActivityTagEditor.vue";
 import CapturePanel from "../component/CapturePanel.vue";
 import TodayReceipt from "../component/TodayReceipt.vue";
 
 export default {
   name: "DayView",
-  components: { ActivityItem, CapturePanel, TodayReceipt },
+  components: {
+    ActivityItem,
+    ActivityTagEditor,
+    CapturePanel,
+    TodayReceipt,
+  },
   setup() {
     const activityStore = useActivityStore();
     const nowMs = ref(Date.now());
     const currentDate = computed(() => getLocalDayAtMs(nowMs.value));
     activityStore.reconcileRunning(nowMs.value);
-    useDragAndDrop(currentDate);
+    const editingActivityId = ref<number | null>(null);
+    let editorTrigger: HTMLElement | null = null;
+
+    function openActivityEditor(activityId: number) {
+      const activity = activityStore.activities.find(
+        (candidate) => candidate.id === activityId,
+      );
+      if (!activity) return;
+      editorTrigger = document.querySelector(
+        `[data-activity-id="${activityId}"]`,
+      );
+      editingActivityId.value = activityId;
+    }
+
+    async function closeActivityEditor() {
+      editingActivityId.value = null;
+      await nextTick();
+      editorTrigger?.focus();
+      editorTrigger = null;
+    }
+
+    useDragAndDrop(currentDate, openActivityEditor);
 
     const activities = computed(() =>
       activityStore.getActivitiesForDay(currentDate.value),
+    );
+    const editingActivity = computed(
+      () =>
+        activityStore.activities.find(
+          (activity) => activity.id === editingActivityId.value,
+        ) ?? null,
     );
     const todayReceipt = computed(() =>
       buildTodayReceipt({
@@ -107,6 +150,9 @@ export default {
       nowMs,
       currentDate,
       todayReceipt,
+      editingActivity,
+      openActivityEditor,
+      closeActivityEditor,
     };
   },
 };
@@ -124,6 +170,12 @@ export default {
 .day-view h1 {
   margin-bottom: 10px;
   grid-column: 1 / 3;
+}
+.timeline-help {
+  grid-column: 1 / 3;
+  margin: 0 0 10px;
+  color: var(--color-muted);
+  font-size: 0.85rem;
 }
 .time-axis-area {
   position: relative;

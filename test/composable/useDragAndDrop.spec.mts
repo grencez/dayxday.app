@@ -16,6 +16,7 @@ describe("useDragAndDrop", () => {
   let mockBorder: HTMLElement;
   let mockTimeMarkers: HTMLElement;
   let wrapper: VueWrapper;
+  let onActivityTap: ReturnType<typeof vi.fn>;
   let startDrag: (
     e: MouseEvent | TouchEvent,
     item: Element,
@@ -33,6 +34,7 @@ describe("useDragAndDrop", () => {
     global.indexedDB = new IDBFactory();
 
     const activityStore = useActivityStore();
+    onActivityTap = vi.fn();
     selectedDate = ref(TEST_DATE);
     activities.value = [
       {
@@ -152,7 +154,7 @@ describe("useDragAndDrop", () => {
     const TestComponent = defineComponent({
       setup() {
         const activityStore = useActivityStore();
-        const dragAndDrop = useDragAndDrop(selectedDate);
+        const dragAndDrop = useDragAndDrop(selectedDate, onActivityTap);
         startDrag = dragAndDrop.startDrag;
         moveDrag = dragAndDrop.moveDrag;
         endDrag = dragAndDrop.endDrag;
@@ -166,6 +168,109 @@ describe("useDragAndDrop", () => {
     });
 
     wrapper = mount(TestComponent);
+  });
+
+  it("treats a surface release below the movement threshold as a tap", async () => {
+    await nextTick();
+
+    startDrag(
+      new MouseEvent("mousedown", { clientX: 20, clientY: 150 }),
+      mockElementA,
+      0,
+      false,
+    );
+    moveDrag(new MouseEvent("mousemove", { clientX: 23, clientY: 154 }));
+    endDrag();
+
+    expect(onActivityTap).toHaveBeenCalledOnce();
+    expect(onActivityTap).toHaveBeenCalledWith(1);
+    expect(wrapper.vm.activities[0].duration_minutes).toBe(100);
+  });
+
+  it("ignores horizontal jitter when distinguishing a tap from a vertical drag", async () => {
+    await nextTick();
+
+    startDrag(
+      new MouseEvent("mousedown", { clientX: 20, clientY: 150 }),
+      mockElementA,
+      0,
+      false,
+    );
+    moveDrag(new MouseEvent("mousemove", { clientX: 80, clientY: 150 }));
+    endDrag();
+
+    expect(onActivityTap).toHaveBeenCalledWith(1);
+    expect(
+      wrapper.vm.activities.map((activity) => activity.start_time_minutes),
+    ).toEqual([100, 200, 300]);
+  });
+
+  it("supports touch taps without mutating timing", async () => {
+    await nextTick();
+    const touchStart = new Event("touchstart", {
+      bubbles: true,
+      cancelable: true,
+    }) as TouchEvent;
+    Object.defineProperty(touchStart, "touches", {
+      value: [{ clientX: 20, clientY: 150 }],
+    });
+
+    startDrag(touchStart, mockElementA, 0, false);
+    endDrag();
+
+    expect(onActivityTap).toHaveBeenCalledWith(1);
+    expect(wrapper.vm.activities[0].duration_minutes).toBe(100);
+  });
+
+  it("rolls timing back when a touch drag is cancelled", async () => {
+    await nextTick();
+    const touchStart = new Event("touchstart", {
+      bubbles: true,
+      cancelable: true,
+    }) as TouchEvent;
+    Object.defineProperty(touchStart, "touches", {
+      value: [{ clientX: 150, clientY: 150 }],
+    });
+    const touchMove = new Event("touchmove", {
+      bubbles: true,
+      cancelable: true,
+    }) as TouchEvent;
+    Object.defineProperty(touchMove, "touches", {
+      value: [{ clientX: 150, clientY: 180 }],
+    });
+
+    startDrag(touchStart, mockElementA, 0, false);
+    moveDrag(touchMove);
+    expect(wrapper.vm.activities[0].duration_minutes).not.toBe(100);
+    window.dispatchEvent(new Event("touchcancel"));
+
+    expect(onActivityTap).not.toHaveBeenCalled();
+    expect(
+      wrapper.vm.activities.map((activity) => [
+        activity.start_time_minutes,
+        activity.duration_minutes,
+      ]),
+    ).toEqual([
+      [100, 100],
+      [200, 100],
+      [300, 100],
+    ]);
+  });
+
+  it("does not treat a real surface drag as a tap", async () => {
+    await nextTick();
+
+    startDrag(
+      new MouseEvent("mousedown", { clientX: 20, clientY: 150 }),
+      mockElementA,
+      0,
+      false,
+    );
+    moveDrag(new MouseEvent("mousemove", { clientX: 150, clientY: 185 }));
+    endDrag();
+
+    expect(onActivityTap).not.toHaveBeenCalled();
+    expect(wrapper.vm.activities[0].duration_minutes).toBe(135);
   });
 
   it("should not change start time of activity A or end time of activity B when dragging the border", async () => {
