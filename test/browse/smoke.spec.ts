@@ -206,6 +206,7 @@ test("dragging the broad closed activity surface still shifts its trailing bound
   await page.reload();
 
   const first = page.locator('[data-activity-id="1"]');
+  await first.scrollIntoViewIfNeeded();
   const box = await first.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);

@@ -2,6 +2,7 @@
   <div class="day-view">
     <h1>Day View</h1>
     <CapturePanel :now-ms="nowMs" />
+    <TodayReceipt :receipt="todayReceipt" />
     <div
       ref="timeAxisAreaRef"
       class="time-axis-area"
@@ -62,7 +63,9 @@ import { useActivityStore } from "../store/activity";
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import ActivityItem from "../component/ActivityItem.vue";
 import CapturePanel from "../component/CapturePanel.vue";
+import TodayReceipt from "../component/TodayReceipt.vue";
 import { useTimeFormatter } from "../composable/useTimeFormatter";
+import { buildTodayReceipt } from "../function/buildTodayReceipt";
 import {
   getLocalDayAtMs,
   getLocalMinuteOfDay,
@@ -73,6 +76,7 @@ export default {
   components: {
     ActivityItem,
     CapturePanel,
+    TodayReceipt,
   },
   setup() {
     const activityStore = useActivityStore();
@@ -84,6 +88,14 @@ export default {
 
     const activities = computed(() =>
       activityStore.getActivitiesForDay(currentDate.value),
+    );
+    const todayReceipt = computed(() =>
+      buildTodayReceipt({
+        activities: activities.value,
+        runningActivity: activityStore.runningActivity,
+        day: currentDate.value,
+        nowMs: nowMs.value,
+      }),
     );
 
     const timeAxisAreaRef = ref<HTMLElement | null>(null);
@@ -134,6 +146,7 @@ export default {
       handleRename,
       nowMs,
       currentDate,
+      todayReceipt,
     };
   },
 };
