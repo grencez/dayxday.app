@@ -11,7 +11,6 @@ const day = "2024-05-10";
 const tagGroups: TagGroup[] = [
   {
     id: "place",
-    name: "Place",
     tags: [
       { id: "office", name: "Office" },
       { id: "home", name: "Home" },
@@ -19,7 +18,6 @@ const tagGroups: TagGroup[] = [
   },
   {
     id: "work",
-    name: "Work",
     tags: [
       { id: "focus", name: "Focus" },
       { id: "old", name: "Old work", archived: true },
@@ -60,7 +58,6 @@ describe("buildTodayReceipt", () => {
     expect(receipt.groupedTotals).toEqual([
       {
         id: "place",
-        name: "Place",
         tags: [
           { id: "office", name: "Office", minutes: 60 },
           { id: "home", name: "Home", minutes: 60 },
@@ -68,7 +65,6 @@ describe("buildTodayReceipt", () => {
       },
       {
         id: "work",
-        name: "Work",
         tags: [{ id: "focus", name: "Focus", minutes: 120 }],
       },
     ]);

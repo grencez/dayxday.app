@@ -14,7 +14,6 @@ describe("structured one-tap capture store", () => {
     store.tagGroups = [
       {
         id: "place",
-        name: "Place",
         exclusive: true,
         tags: [
           { id: "office", name: "Office" },
@@ -23,7 +22,6 @@ describe("structured one-tap capture store", () => {
       },
       {
         id: "work",
-        name: "Work",
         tags: [
           { id: "focus", name: "Focus" },
           { id: "meeting", name: "Meeting" },

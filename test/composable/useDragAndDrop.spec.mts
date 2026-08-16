@@ -304,31 +304,49 @@ describe("useDragAndDrop", () => {
     }
   });
 
-  it("should snap to the nearest hour marker when resizing and mouse is in time markers area", async () => {
-    await nextTick(); // Wait for onMounted to run
+  it("snaps to the nearest 15-minute boundary while resizing over the time margin", async () => {
+    await nextTick();
 
-    // Simulate mousedown on the first activity to start resizing
-    const mousedownEvent = new MouseEvent("mousedown", { clientY: 150 });
-    startDrag(mousedownEvent, mockElementA, 0, false);
-
-    // Simulate mousemove to a position within the time markers area
-    const mousemoveEvent = new MouseEvent("mousemove", {
-      clientY: 180, // Between hour markers (e.g., between 2nd and 3rd hour)
-      clientX: 50, // Within the time markers area (left: 0, right: 100)
-    });
-    moveDrag(mousemoveEvent);
+    startDrag(
+      new MouseEvent("mousedown", { clientY: 150 }),
+      mockElementA,
+      0,
+      false,
+    );
+    moveDrag(
+      new MouseEvent("mousemove", {
+        clientY: 172,
+        clientX: 50,
+      }),
+    );
     endDrag();
 
-    // Assert that the activity's end time snaped to the nearest hour marker
-    const newDuration = wrapper.vm.activities[0].duration_minutes;
+    expect(wrapper.vm.activities[0].duration_minutes).toBe(65);
+    expect(wrapper.vm.activities[1].start_time_minutes).toBe(165);
+  });
 
-    // Calculate what the snapped end time should have been
-    const nearestHour = Math.round(180 / 60); // 60 is the height of an hour
-    const expectedSnappedEndTime = nearestHour * 60;
-    const expectedSnappedDuration =
-      expectedSnappedEndTime - wrapper.vm.activities[0].start_time_minutes;
+  it("snaps a dragged border to 15-minute boundaries over the time margin", async () => {
+    await nextTick();
 
-    expect(newDuration).toBe(expectedSnappedDuration);
+    startDrag(
+      new MouseEvent("mousedown", { clientY: 150 }),
+      mockBorder,
+      0,
+      true,
+    );
+    moveDrag(
+      new MouseEvent("mousemove", {
+        clientY: 172,
+        clientX: 50,
+      }),
+    );
+    endDrag();
+
+    expect(wrapper.vm.activities[0].duration_minutes).toBe(65);
+    expect(wrapper.vm.activities[1]).toMatchObject({
+      start_time_minutes: 165,
+      duration_minutes: 135,
+    });
   });
 
   it("uses the currently selected date when a drag starts", async () => {

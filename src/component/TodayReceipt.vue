@@ -30,11 +30,11 @@
         </p>
         <div v-else>
           <section
-            v-for="group in receipt.groupedTotals"
+            v-for="(group, groupIndex) in receipt.groupedTotals"
             :key="group.id"
             class="tag-total-group"
+            :aria-label="`Group ${groupIndex + 1}`"
           >
-            <h4>{{ group.name }}</h4>
             <ul class="tag-totals">
               <li v-for="tag in group.tags" :key="tag.id">
                 <span>{{ tag.name }}</span>
@@ -137,10 +137,9 @@ defineProps<{ receipt: TodayReceipt }>();
   margin-bottom: 8px;
   font-size: 1em;
 }
-.tag-total-group h4 {
-  margin: 12px 0 4px;
-  font-size: 0.9em;
-  color: var(--color-muted);
+.tag-total-group + .tag-total-group {
+  margin-top: 8px;
+  border-top: 2px solid var(--color-border);
 }
 .tag-totals,
 .receipt-segments {

@@ -214,14 +214,9 @@ export const useActivityStore = defineStore("dayxday-structured-tags-v1", {
         ),
       );
     },
-    createGroup(groupName: string, initialTagName: string): boolean {
-      const name = normalizedName(groupName);
+    createGroup(initialTagName: string): boolean {
       const tagName = normalizedName(initialTagName);
-      if (
-        name === null ||
-        tagName === null ||
-        !this.isTagNameAvailable(tagName)
-      ) {
+      if (tagName === null || !this.isTagNameAvailable(tagName)) {
         return false;
       }
       const groupIds = new Set(this.tagGroups.map((group) => group.id));
@@ -236,20 +231,10 @@ export const useActivityStore = defineStore("dayxday-structured-tags-v1", {
       const [tagId, nextTagId] = nextStringId("tag", this.nextTagId, tagIds);
       this.tagGroups.push({
         id: groupId,
-        name,
         tags: [{ id: tagId, name: tagName }],
       });
       this.nextGroupId = nextGroupId;
       this.nextTagId = nextTagId;
-      return true;
-    },
-    renameGroup(groupId: string, groupName: string): boolean {
-      const group = this.tagGroups.find(
-        (candidate) => candidate.id === groupId,
-      );
-      const name = normalizedName(groupName);
-      if (!group || name === null) return false;
-      group.name = name;
       return true;
     },
     toggleGroupExclusive(groupId: string, nowMs = Date.now()) {

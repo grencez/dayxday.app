@@ -20,7 +20,6 @@ export interface ReceiptTagTotal {
 
 export interface ReceiptGroupTotal {
   id: string;
-  name: string;
   tags: ReceiptTagTotal[];
 }
 
@@ -206,7 +205,6 @@ export function buildTodayReceipt({
   const groupedTotals = tagGroups
     .map((group) => ({
       id: group.id,
-      name: group.name,
       tags: group.tags
         .filter((tag) => intervalsByTag.has(tag.id))
         .map((tag) => ({

@@ -6,7 +6,6 @@ export interface Tag {
 
 export interface TagGroup {
   id: string;
-  name: string;
   tags: Tag[];
   exclusive?: true;
 }

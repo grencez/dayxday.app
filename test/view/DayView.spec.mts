@@ -14,7 +14,6 @@ describe("DayView", () => {
     store.tagGroups = [
       {
         id: "work",
-        name: "Work",
         tags: [
           { id: "focus", name: "Focus" },
           { id: "meeting", name: "Meeting" },
@@ -69,6 +68,22 @@ describe("DayView", () => {
     expect(wrapper.get('[role="dialog"]').text()).toContain(
       "Edit activity tags",
     );
+    wrapper.unmount();
+  });
+
+  it("removes a confirmed activity from the editor, timeline, and receipt", async () => {
+    const store = useActivityStore();
+    const wrapper = mount(DayView, { attachTo: document.body });
+    await wrapper.get('[data-activity-id="1"]').trigger("keydown.enter");
+    await wrapper.get(".activity-editor-delete-button").trigger("click");
+    await wrapper.get(".activity-editor-confirm-delete").trigger("click");
+
+    expect(store.activities.map(({ id }) => id)).toEqual([2]);
+    expect(wrapper.find('[data-activity-id="1"]').exists()).toBe(false);
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+    expect(wrapper.get(".receipt-segments").text()).not.toContain("Focus");
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(wrapper.get("h1").element);
     wrapper.unmount();
   });
 

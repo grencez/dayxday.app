@@ -16,7 +16,6 @@ describe("CapturePanel", () => {
     store.tagGroups = [
       {
         id: "place",
-        name: "Place",
         exclusive: true,
         tags: [
           { id: "office", name: "Office" },
@@ -25,7 +24,6 @@ describe("CapturePanel", () => {
       },
       {
         id: "work",
-        name: "Work",
         tags: [
           { id: "focus", name: "Focus" },
           { id: "old", name: "Old", archived: true },
@@ -48,6 +46,10 @@ describe("CapturePanel", () => {
     const store = configure();
     const wrapper = mount(CapturePanel, { props: { nowMs } });
     const toggles = wrapper.findAll(".tag-toggle");
+    const legends = wrapper.findAll(".tag-choices legend");
+    expect(legends[0].text()).toContain("Group 1. Choose at most one");
+    expect(legends[1].get(".sr-only").text()).toBe("Group 2.");
+    expect(legends[1].text()).toBe("Group 2.");
     expect(toggles.map((button) => button.text())).toEqual([
       "Office",
       "Home",

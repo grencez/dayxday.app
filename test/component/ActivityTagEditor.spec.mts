@@ -13,7 +13,6 @@ describe("ActivityTagEditor", () => {
     store.tagGroups = [
       {
         id: "place",
-        name: "Place",
         exclusive: true,
         tags: [
           { id: "office", name: "Office" },
@@ -23,7 +22,6 @@ describe("ActivityTagEditor", () => {
       },
       {
         id: "work",
-        name: "Work",
         tags: [
           { id: "focus", name: "Focus" },
           { id: "meeting", name: "Meeting" },
@@ -198,19 +196,65 @@ describe("ActivityTagEditor", () => {
     expect(wrapper.emitted("close")).toBeUndefined();
   });
 
-  it("closes on Escape or backdrop without saving", async () => {
+  it("requires inline confirmation before deleting an activity", async () => {
     const store = useActivityStore();
     const wrapper = mountEditor();
+
+    await wrapper.get(".activity-editor-delete-button").trigger("click");
+    expect(store.activities.map(({ id }) => id)).toEqual([1, 2]);
+    expect(
+      wrapper.get(".activity-editor-delete-confirmation").text(),
+    ).toContain("This cannot be undone");
+    await wrapper.get(".activity-editor-confirm-delete").trigger("click");
+
+    expect(store.activities.map(({ id }) => id)).toEqual([2]);
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("cancels deletion inline without closing or mutating", async () => {
+    const store = useActivityStore();
+    const wrapper = mount(ActivityTagEditor, {
+      attachTo: document.body,
+      props: { activity: store.activities[0] },
+    });
+    await wrapper.get(".activity-editor-delete-button").trigger("click");
     await wrapper
-      .findAll(".tag-toggle")
-      .find((button) => button.text() === "Focus")!
+      .findAll("button")
+      .find((button) => button.text() === "Cancel deletion")!
       .trigger("click");
+
+    expect(store.activities.map(({ id }) => id)).toEqual([1, 2]);
+    expect(wrapper.find(".activity-editor-delete-confirmation").exists()).toBe(
+      false,
+    );
+    expect(wrapper.emitted("close")).toBeUndefined();
+    expect(document.activeElement).toBe(
+      wrapper.get(".activity-editor-delete-button").element,
+    );
+    wrapper.unmount();
+  });
+
+  it("closes on Cancel, Escape, or backdrop without deleting", async () => {
+    const store = useActivityStore();
+    const cancelWrapper = mountEditor();
+    await cancelWrapper.get(".activity-editor-delete-button").trigger("click");
+    await cancelWrapper
+      .findAll("button")
+      .find((button) => button.text() === "Cancel")!
+      .trigger("click");
+    expect(cancelWrapper.emitted("close")).toHaveLength(1);
+
+    const wrapper = mountEditor();
+    await wrapper.get(".activity-editor-delete-button").trigger("click");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(wrapper.emitted("close")).toHaveLength(1);
-    expect(store.activities[0].tagIds).toEqual(["office", "old"]);
 
     const backdropWrapper = mountEditor();
+    await backdropWrapper
+      .get(".activity-editor-delete-button")
+      .trigger("click");
     await backdropWrapper.get(".activity-editor-backdrop").trigger("click");
     expect(backdropWrapper.emitted("close")).toHaveLength(1);
+    expect(store.activities.map(({ id }) => id)).toEqual([1, 2]);
   });
 });

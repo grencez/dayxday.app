@@ -30,7 +30,7 @@ describe("structured state persistence", () => {
     wrappers.push(mountPersistedApp());
     const first = useActivityStore();
     expect(first.activities).toEqual([]);
-    first.createGroup("Work", "Focus");
+    first.createGroup("Focus");
     first.addTag(first.tagGroups[0].id, "Meeting");
     const [focus, meeting] = first.tagGroups[0].tags;
     const now = Date.now();
@@ -50,5 +50,48 @@ describe("structured state persistence", () => {
     expect(reloaded.activities[0].tagIds).toEqual([focus.id]);
     expect(reloaded.runningActivity?.tagIds).toEqual([meeting.id]);
     expect(reloaded.canUndoLastTransition).toBe(true);
+  });
+
+  it("persists confirmed closed-activity deletion", async () => {
+    wrappers.push(mountPersistedApp());
+    const first = useActivityStore();
+    first.createGroup("Focus");
+    const tagId = first.tagGroups[0].tags[0].id;
+    first.initializeActivities([
+      {
+        id: 1,
+        tagIds: [tagId],
+        start_time_minutes: 60,
+        duration_minutes: 30,
+        date: "2024-05-10",
+      },
+    ]);
+    first.removeActivity(1);
+    await nextTick();
+
+    wrappers.pop()!.unmount();
+    await nextTick();
+    wrappers.push(mountPersistedApp());
+    expect(useActivityStore().activities).toEqual([]);
+  });
+
+  it("ignores legacy persisted group names without migrating the key", () => {
+    localStorage.setItem(
+      "dayxday-structured-tags-v1",
+      JSON.stringify({
+        tagGroups: [
+          {
+            id: "legacy-group",
+            name: "Legacy group name",
+            tags: [{ id: "focus", name: "Focus" }],
+          },
+        ],
+      }),
+    );
+    wrappers.push(mountPersistedApp());
+    const store = useActivityStore();
+    expect(store.titleForSelection(["focus"])).toBe("Focus");
+    expect(document.body.textContent).not.toContain("Legacy group name");
+    expect(localStorage.getItem("dayxday-structured-tags-v1")).not.toBeNull();
   });
 });

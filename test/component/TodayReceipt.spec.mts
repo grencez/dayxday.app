@@ -10,7 +10,6 @@ const receipt = {
   groupedTotals: [
     {
       id: "work",
-      name: "Work",
       tags: [{ id: "focus", name: "Focus", minutes: 90 }],
     },
   ],
@@ -31,8 +30,10 @@ describe("TodayReceipt", () => {
   it("renders grouped per-tag totals and chronological segment titles", () => {
     const wrapper = mount(TodayReceipt, { props: { receipt } });
     expect(wrapper.text()).toContain("15% tracked");
-    expect(wrapper.get(".tag-total-group").text()).toContain("Work");
-    expect(wrapper.get(".tag-total-group").text()).toContain("Focus");
+    expect(wrapper.get(".tag-total-group").text()).toBe("Focus1h 30m");
+    expect(wrapper.get(".tag-total-group").attributes("aria-label")).toBe(
+      "Group 1",
+    );
     expect(wrapper.get(".receipt-segments").text()).toContain("Current");
   });
 

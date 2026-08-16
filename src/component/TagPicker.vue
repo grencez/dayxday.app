@@ -1,9 +1,10 @@
 <template>
   <div class="tag-picker">
     <div v-if="activeGroups.length" class="tag-choices">
-      <fieldset v-for="group in activeGroups" :key="group.id">
+      <fieldset v-for="(group, groupIndex) in activeGroups" :key="group.id">
         <legend>
-          {{ group.name }}<span v-if="group.exclusive"> (choose one)</span>
+          <span class="sr-only">Group {{ groupIndex + 1 }}. </span>
+          <span v-if="group.exclusive">Choose at most one</span>
         </legend>
         <button
           v-for="tag in group.tags"
@@ -161,6 +162,17 @@ function removeArchivedTag(tagId: string) {
 }
 .archived-tag-toggle {
   border-style: dashed;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .tag-picker-recent {
   display: flex;

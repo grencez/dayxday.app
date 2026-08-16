@@ -27,7 +27,6 @@ describe("structured activity store", () => {
     store.tagGroups = [
       {
         id: "g1",
-        name: "Context",
         exclusive: true,
         tags: [
           { id: "office", name: "Office" },
@@ -36,7 +35,6 @@ describe("structured activity store", () => {
       },
       {
         id: "g2",
-        name: "Work",
         tags: [
           { id: "focus", name: "Focus" },
           { id: "admin", name: "Admin" },
@@ -54,12 +52,13 @@ describe("structured activity store", () => {
 
   it("creates groups and enforces globally unique trimmed tag names including archived", () => {
     const store = useActivityStore();
-    expect(store.createGroup(" Context ", " Office ")).toBe(true);
+    expect(store.createGroup(" Office ")).toBe(true);
+    expect(store.tagGroups[0]).not.toHaveProperty("name");
     expect(store.addTag(store.tagGroups[0].id, "office")).toBe(false);
     store.archiveTag(store.tagGroups[0].tags[0].id);
-    expect(store.createGroup("Other", "OFFICE")).toBe(false);
+    expect(store.createGroup("OFFICE")).toBe(false);
     expect(store.renameTag(store.tagGroups[0].tags[0].id, "Desk")).toBe(true);
-    expect(store.createGroup("Other", "Office")).toBe(true);
+    expect(store.createGroup("Office")).toBe(true);
     expect(
       new Set(
         store.tagGroups.flatMap((group) => group.tags.map((tag) => tag.id)),

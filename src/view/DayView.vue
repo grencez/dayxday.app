@@ -1,6 +1,6 @@
 <template>
   <div class="day-view">
-    <h1>Day View</h1>
+    <h1 ref="dayHeadingRef" tabindex="-1">Day View</h1>
     <CapturePanel :now-ms="nowMs" />
     <TodayReceipt :receipt="todayReceipt" />
     <p class="timeline-help">
@@ -88,6 +88,7 @@ export default {
     const currentDate = computed(() => getLocalDayAtMs(nowMs.value));
     activityStore.reconcileRunning(nowMs.value);
     const editingActivityId = ref<number | null>(null);
+    const dayHeadingRef = ref<HTMLElement | null>(null);
     let editorTrigger: HTMLElement | null = null;
 
     function openActivityEditor(activityId: number) {
@@ -104,7 +105,8 @@ export default {
     async function closeActivityEditor() {
       editingActivityId.value = null;
       await nextTick();
-      editorTrigger?.focus();
+      if (editorTrigger?.isConnected) editorTrigger.focus();
+      else dayHeadingRef.value?.focus();
       editorTrigger = null;
     }
 
@@ -151,6 +153,7 @@ export default {
       currentDate,
       todayReceipt,
       editingActivity,
+      dayHeadingRef,
       openActivityEditor,
       closeActivityEditor,
     };

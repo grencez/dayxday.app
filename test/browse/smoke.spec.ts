@@ -48,7 +48,6 @@ function stateForToday() {
     tagGroups: [
       {
         id: "work",
-        name: "Work",
         tags: [
           { id: "focus", name: "Focus" },
           { id: "meeting", name: "Meeting" },
@@ -125,6 +124,40 @@ test("mobile tap edits a closed activity and persists after reload", async ({
   await context.close();
 });
 
+test("mobile deletion requires confirmation and persists after reload", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+  await page.evaluate(
+    ({ key, state }) => localStorage.setItem(key, JSON.stringify(state)),
+    { key: storeKey, state: stateForToday() },
+  );
+  await page.reload();
+
+  await page.locator('[data-activity-id="1"]').tap();
+  const editor = page.getByRole("dialog", { name: "Edit activity tags" });
+  await editor.getByRole("button", { name: "Delete activity" }).tap();
+  await expect(page.locator('[data-activity-id="1"]')).toBeVisible();
+  await editor.getByRole("button", { name: "Confirm delete activity" }).tap();
+  await expect(page.locator('[data-activity-id="1"]')).toHaveCount(0);
+  await expect(page.locator(".receipt-segments")).not.toContainText("Focus");
+
+  await page.reload();
+  await expect(page.locator('[data-activity-id="1"]')).toHaveCount(0);
+  expect(
+    await page.evaluate((key) => {
+      const state = JSON.parse(localStorage.getItem(key)!);
+      return state.activities.map((activity: { id: number }) => activity.id);
+    }, storeKey),
+  ).toEqual([2]);
+  await context.close();
+});
+
 test("follows the system color scheme", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
@@ -165,7 +198,7 @@ test("configures tags, captures a combination, and persists it", async ({
   await expect(page).toHaveURL(/\/#\/tags$/);
   await page.reload();
   await expect(page.getByRole("heading", { name: "Tags" })).toBeVisible();
-  await page.getByLabel("Group name", { exact: true }).fill("Work");
+  await expect(page.getByLabel("Group name", { exact: true })).toHaveCount(0);
   await page.getByLabel("Initial tag", { exact: true }).fill("Focus");
   await page.getByRole("button", { name: "Create group" }).click();
   await page.getByRole("link", { name: "Today", exact: true }).click();

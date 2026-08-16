@@ -39,6 +39,36 @@
       <p v-if="!selectionIsValid" class="activity-editor-error" role="status">
         Select at least one valid tag to save.
       </p>
+      <div class="activity-editor-delete">
+        <button
+          v-if="!confirmingDelete"
+          ref="deleteButtonRef"
+          type="button"
+          class="activity-editor-delete-button"
+          @click="requestDelete"
+        >
+          Delete activity
+        </button>
+        <div
+          v-else
+          class="activity-editor-delete-confirmation"
+          role="group"
+          aria-label="Confirm activity deletion"
+        >
+          <p>Delete this activity? This cannot be undone.</p>
+          <div>
+            <button type="button" @click="cancelDelete">Cancel deletion</button>
+            <button
+              ref="confirmDeleteRef"
+              type="button"
+              class="activity-editor-confirm-delete"
+              @click="deleteActivity"
+            >
+              Confirm delete activity
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="activity-editor-actions">
         <button type="button" @click="closeEditor">Cancel</button>
         <button
@@ -66,6 +96,9 @@ const activityStore = useActivityStore();
 const selectedTagIds = ref([...props.activity.tagIds]);
 const dialogRef = ref<HTMLElement | null>(null);
 const closeButtonRef = ref<HTMLButtonElement | null>(null);
+const deleteButtonRef = ref<HTMLButtonElement | null>(null);
+const confirmDeleteRef = ref<HTMLButtonElement | null>(null);
+const confirmingDelete = ref(false);
 
 const selectionIsValid = computed(() =>
   isValidSelection(selectedTagIds.value, activityStore.tagGroups, false),
@@ -80,6 +113,23 @@ function save() {
   activityStore.updateActivity(props.activity.id, {
     tagIds: selectedTagIds.value,
   });
+  closeEditor();
+}
+
+async function requestDelete() {
+  confirmingDelete.value = true;
+  await nextTick();
+  confirmDeleteRef.value?.focus();
+}
+
+async function cancelDelete() {
+  confirmingDelete.value = false;
+  await nextTick();
+  deleteButtonRef.value?.focus();
+}
+
+function deleteActivity() {
+  activityStore.removeActivity(props.activity.id);
   closeEditor();
 }
 
@@ -187,6 +237,32 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown));
 }
 .activity-editor-save {
   font-weight: 700;
+}
+.activity-editor-delete {
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+.activity-editor-delete-button,
+.activity-editor-delete-confirmation button {
+  min-height: 44px;
+}
+.activity-editor-delete-button,
+.activity-editor-confirm-delete {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+.activity-editor-delete-confirmation {
+  display: grid;
+  gap: 8px;
+}
+.activity-editor-delete-confirmation p {
+  margin: 0;
+}
+.activity-editor-delete-confirmation div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 @media (min-width: 700px) {

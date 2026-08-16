@@ -12,7 +12,6 @@ import {
 const groups: TagGroup[] = [
   {
     id: "context",
-    name: "Context",
     tags: [
       { id: "office", name: "Office" },
       { id: "home", name: "Home" },
@@ -21,7 +20,6 @@ const groups: TagGroup[] = [
   },
   {
     id: "kind",
-    name: "Kind",
     tags: [
       { id: "focus", name: "Focus" },
       { id: "planning", name: "Planning", archived: true },

@@ -10,21 +10,22 @@ describe("TagsView", () => {
   it("creates a group with an initial tag and configures exclusivity", async () => {
     const wrapper = mount(TagsView);
     const inputs = wrapper.findAll(".create-group input");
-    await inputs[0].setValue("Work");
-    await inputs[1].setValue("Focus");
+    expect(inputs).toHaveLength(1);
+    await inputs[0].setValue("Focus");
     await wrapper.get(".create-group").trigger("submit");
     const store = useActivityStore();
     expect(store.tagGroups[0]).toMatchObject({
-      name: "Work",
       tags: [{ name: "Focus" }],
     });
+    expect(store.tagGroups[0]).not.toHaveProperty("name");
+    expect(wrapper.get(".tag-group-card h2").text()).toBe("Group 1");
     await wrapper.get(".exclusive-control input").setValue(true);
     expect(store.tagGroups[0].exclusive).toBe(true);
   });
 
   it("adds, archives, renames, restores, and reorders tags", async () => {
     const store = useActivityStore();
-    store.createGroup("Work", "Focus");
+    store.createGroup("Focus");
     store.addTag(store.tagGroups[0].id, "Meeting");
     const wrapper = mount(TagsView);
     const archive = wrapper
@@ -52,7 +53,7 @@ describe("TagsView", () => {
 
   it("reorders relative to visible active tags while skipping archived tags", async () => {
     const store = useActivityStore();
-    store.createGroup("Work", "Focus");
+    store.createGroup("Focus");
     const groupId = store.tagGroups[0].id;
     store.addTag(groupId, "Hidden");
     store.addTag(groupId, "Meeting");
@@ -83,12 +84,11 @@ describe("TagsView", () => {
 
   it("rejects case-insensitive duplicates including archived tags", async () => {
     const store = useActivityStore();
-    store.createGroup("Work", "Focus");
+    store.createGroup("Focus");
     store.archiveTag(store.tagGroups[0].tags[0].id);
     const wrapper = mount(TagsView);
     const formInputs = wrapper.findAll(".create-group input");
-    await formInputs[0].setValue("Other");
-    await formInputs[1].setValue(" focus ");
+    await formInputs[0].setValue(" focus ");
     await wrapper.get(".create-group").trigger("submit");
     expect(store.tagGroups).toHaveLength(1);
     expect(wrapper.get('[role="status"]').text()).toContain("globally unique");

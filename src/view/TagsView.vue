@@ -6,10 +6,6 @@
     <form class="create-group" @submit.prevent="createGroup">
       <h2>Create group</h2>
       <label>
-        Group name
-        <input v-model="newGroupName" required />
-      </label>
-      <label>
         Initial tag
         <input v-model="initialTagName" required />
       </label>
@@ -27,19 +23,12 @@
       class="tag-group-card"
     >
       <div class="group-heading">
-        <label>
-          <span class="sr-only">Group name</span>
-          <input
-            :value="group.name"
-            :aria-label="`Rename group ${group.name}`"
-            @change="renameGroup(group.id, $event)"
-          />
-        </label>
+        <h2>{{ groupLabel(groupIndex) }}</h2>
         <div class="reorder-controls">
           <button
             type="button"
             :disabled="groupIndex === 0"
-            :aria-label="`Move ${group.name} up`"
+            :aria-label="`Move ${groupLabel(groupIndex)} up`"
             @click="activityStore.moveGroup(group.id, -1)"
           >
             ↑
@@ -47,7 +36,7 @@
           <button
             type="button"
             :disabled="groupIndex === activityStore.tagGroups.length - 1"
-            :aria-label="`Move ${group.name} down`"
+            :aria-label="`Move ${groupLabel(groupIndex)} down`"
             @click="activityStore.moveGroup(group.id, 1)"
           >
             ↓
@@ -130,7 +119,6 @@ import type { Tag, TagGroup } from "../function/tagSelection";
 import { useActivityStore } from "../store/activity";
 
 const activityStore = useActivityStore();
-const newGroupName = ref("");
 const initialTagName = ref("");
 const newTagNames = reactive<Record<string, string>>({});
 const message = ref("");
@@ -140,13 +128,14 @@ const activeTags = (group: TagGroup): Tag[] =>
 const archivedTags = (group: TagGroup): Tag[] =>
   group.tags.filter((tag) => tag.archived === true);
 
+const groupLabel = (index: number) => `Group ${index + 1}`;
+
 function createGroup() {
-  if (activityStore.createGroup(newGroupName.value, initialTagName.value)) {
-    newGroupName.value = "";
+  if (activityStore.createGroup(initialTagName.value)) {
     initialTagName.value = "";
     message.value = "Group created.";
   } else {
-    message.value = "Enter names and use a globally unique tag name.";
+    message.value = "Enter a globally unique tag name.";
   }
 }
 
@@ -156,17 +145,6 @@ function addTag(groupId: string) {
     message.value = "Tag added.";
   } else {
     message.value = "Tag names must be nonempty and globally unique.";
-  }
-}
-
-function renameGroup(groupId: string, event: Event) {
-  const input = event.target as HTMLInputElement;
-  const group = activityStore.tagGroups.find(
-    (candidate) => candidate.id === groupId,
-  );
-  if (!activityStore.renameGroup(groupId, input.value)) {
-    input.value = group?.name ?? "";
-    message.value = "Group names cannot be empty.";
   }
 }
 
@@ -210,6 +188,7 @@ function restoreTag(tagId: string) {
   background: var(--color-surface);
 }
 .create-group h2,
+.tag-group-card h2,
 .tag-group-card h3 {
   margin: 0;
 }
@@ -229,9 +208,6 @@ function restoreTag(tagId: string) {
 }
 .group-heading {
   justify-content: space-between;
-}
-.group-heading label {
-  flex: 1;
 }
 .tag-list {
   display: grid;
@@ -269,16 +245,5 @@ function restoreTag(tagId: string) {
 .archived-tags summary {
   min-height: 44px;
   cursor: pointer;
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 </style>
