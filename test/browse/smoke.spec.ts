@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { preview, type PreviewServer } from "vite";
 
 const previewPort = Number(process.env.DAYXDAY_TEST_PORT ?? 4173);
@@ -17,6 +17,50 @@ test.beforeAll(async () => {
   });
 });
 test.afterAll(async () => previewServer?.close());
+
+async function dragByTouch(locator: Locator, deltaY: number) {
+  await locator.evaluate((element, movement) => {
+    const rect = element.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+    const touch = (y: number) =>
+      new Touch({
+        identifier: 1,
+        target: element,
+        clientX,
+        clientY: y,
+        radiusX: 1,
+        radiusY: 1,
+        force: 1,
+      });
+    const start = touch(clientY);
+    element.dispatchEvent(
+      new TouchEvent("touchstart", {
+        bubbles: true,
+        cancelable: true,
+        touches: [start],
+        changedTouches: [start],
+      }),
+    );
+    const moved = touch(clientY + movement);
+    window.dispatchEvent(
+      new TouchEvent("touchmove", {
+        bubbles: true,
+        cancelable: true,
+        touches: [moved],
+        changedTouches: [moved],
+      }),
+    );
+    window.dispatchEvent(
+      new TouchEvent("touchend", {
+        bubbles: true,
+        cancelable: true,
+        touches: [],
+        changedTouches: [moved],
+      }),
+    );
+  }, deltaY);
+}
 
 function stateForToday() {
   const today = new Date();
@@ -124,6 +168,90 @@ test("mobile tap edits a closed activity and persists after reload", async ({
   await context.close();
 });
 
+test("two-click creation handles exact times, gaps, dragging, and takeover", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  const state = stateForToday();
+  state.activities = [];
+  state.nextId = 1;
+  await page.goto("/");
+  await page.evaluate(
+    ({ key, persisted }) =>
+      localStorage.setItem(key, JSON.stringify(persisted)),
+    { key: storeKey, persisted: state },
+  );
+  await page.reload();
+  await page.locator(".capture-panel .tag-toggle").nth(0).tap();
+  const axis = page.locator(".time-axis-area");
+
+  // Pick 05:00 first and 03:00 second: future time is allowed.
+  await axis.tap({ position: { x: 20, y: 300 } });
+  await expect(page.locator(".creation-boundary")).toBeVisible();
+  await expect(page.locator(".timeline-help")).toContainText(
+    "Boundary at 05:00",
+  );
+  await axis.tap({ position: { x: 20, y: 180 } });
+
+  // Pick 02:00, then claim the unfilled side through 03:00.
+  await axis.tap({ position: { x: 20, y: 120 } });
+  await page
+    .locator(".timeline-gap")
+    .first()
+    .tap({
+      position: { x: 100, y: 150 },
+    });
+
+  // The broad 02:00 activity surface moves the same shared boundary to 02:45.
+  const twoAmActivity = page.locator('[data-activity-id="2"]');
+  await twoAmActivity.scrollIntoViewIfNeeded();
+  await dragByTouch(twoAmActivity, -15);
+
+  // Select Meeting, split at 04:00, and claim the activity side above it.
+  const choices = page.locator(".capture-panel .tag-toggle");
+  await choices.nth(0).tap();
+  await choices.nth(1).tap();
+  await axis.tap({ position: { x: 20, y: 240 } });
+  await page.locator('[data-activity-id="1"]').tap({
+    position: { x: 100, y: 45 },
+  });
+
+  const expectedIntervals = [
+    { tagIds: ["focus"], start: 120, duration: 45 },
+    { tagIds: ["meeting"], start: 165, duration: 75 },
+    { tagIds: ["focus"], start: 240, duration: 60 },
+  ];
+  const readIntervals = () =>
+    page.evaluate((key) => {
+      const persisted = JSON.parse(localStorage.getItem(key)!);
+      return persisted.activities.map(
+        (activity: {
+          tagIds: string[];
+          start_time_minutes: number;
+          duration_minutes: number;
+        }) => ({
+          tagIds: activity.tagIds,
+          start: activity.start_time_minutes,
+          duration: activity.duration_minutes,
+        }),
+      );
+    }, storeKey);
+  await expect.poll(readIntervals).toEqual(expectedIntervals);
+
+  await page.reload();
+  await expect.poll(readIntervals).toEqual(expectedIntervals);
+  await expect(page.locator(".activity-item")).toHaveText([
+    "Focus",
+    "Meeting",
+    "Focus",
+  ]);
+  await context.close();
+});
+
 test("mobile deletion requires confirmation and persists after reload", async ({
   browser,
 }) => {
@@ -145,7 +273,7 @@ test("mobile deletion requires confirmation and persists after reload", async ({
   await expect(page.locator('[data-activity-id="1"]')).toBeVisible();
   await editor.getByRole("button", { name: "Confirm delete activity" }).tap();
   await expect(page.locator('[data-activity-id="1"]')).toHaveCount(0);
-  await expect(page.locator(".receipt-segments")).not.toContainText("Focus");
+  await expect(page.locator(".today-receipt")).not.toContainText("Focus");
 
   await page.reload();
   await expect(page.locator('[data-activity-id="1"]')).toHaveCount(0);
@@ -274,13 +402,69 @@ test("archived tags leave historical display but disappear from capture", async 
   await expect(page.locator(".tag-total-group")).toContainText("Focus");
 });
 
-test("dragging the broad closed activity surface still shifts its trailing boundary", async ({
-  page,
-}) => {
+test("dragging a shared border moves only that boundary", async ({ page }) => {
+  const state = stateForToday();
+  state.activities.push({
+    id: 3,
+    tagIds: ["focus"],
+    start_time_minutes: 180,
+    duration_minutes: 60,
+    date: state.activities[0].date,
+  });
+  state.nextId = 4;
   await page.goto("/");
   await page.evaluate(
-    ({ key, state }) => localStorage.setItem(key, JSON.stringify(state)),
-    { key: storeKey, state: stateForToday() },
+    ({ key, persisted }) =>
+      localStorage.setItem(key, JSON.stringify(persisted)),
+    { key: storeKey, persisted: state },
+  );
+  await page.reload();
+
+  const border = page.locator(".activity-border").first();
+  await border.scrollIntoViewIfNeeded();
+  const box = await border.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2 + 15);
+  await page.mouse.up();
+
+  await expect
+    .poll(() =>
+      page.evaluate((key) => {
+        const persisted = JSON.parse(localStorage.getItem(key)!);
+        return persisted.activities.map(
+          (activity: {
+            start_time_minutes: number;
+            duration_minutes: number;
+          }) => [activity.start_time_minutes, activity.duration_minutes],
+        );
+      }, storeKey),
+    )
+    .toEqual([
+      [60, 75],
+      [135, 45],
+      [180, 60],
+    ]);
+});
+
+test("dragging the broad activity surface moves the same local boundary", async ({
+  page,
+}) => {
+  const state = stateForToday();
+  state.activities.push({
+    id: 3,
+    tagIds: ["focus"],
+    start_time_minutes: 180,
+    duration_minutes: 60,
+    date: state.activities[0].date,
+  });
+  state.nextId = 4;
+  await page.goto("/");
+  await page.evaluate(
+    ({ key, persisted }) =>
+      localStorage.setItem(key, JSON.stringify(persisted)),
+    { key: storeKey, persisted: state },
   );
   await page.reload();
   const first = page.locator('[data-activity-id="1"]');
@@ -305,6 +489,7 @@ test("dragging the broad closed activity surface still shifts its trailing bound
     )
     .toEqual([
       [90, 60],
-      [60, 150],
+      [30, 150],
+      [60, 180],
     ]);
 });

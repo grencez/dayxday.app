@@ -65,20 +65,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { RouterLink } from "vue-router";
 import { isValidSelection, normalizeSelection } from "../function/tagSelection";
 import { useActivityStore } from "../store/activity";
 import TagPicker from "./TagPicker.vue";
 
 const props = defineProps<{ nowMs: number }>();
+const selectedTagIds = defineModel<string[]>("selectedTagIds", {
+  default: () => [],
+});
 const activityStore = useActivityStore();
-const selectedTagIds = ref<string[]>(
-  normalizeSelection(
-    activityStore.runningActivity?.tagIds ?? [],
+if (selectedTagIds.value.length === 0 && activityStore.runningActivity) {
+  selectedTagIds.value = normalizeSelection(
+    activityStore.runningActivity.tagIds,
     activityStore.tagGroups,
-  ),
-);
+  );
+}
 const selectionIsValid = computed(() =>
   isValidSelection(selectedTagIds.value, activityStore.tagGroups, true),
 );

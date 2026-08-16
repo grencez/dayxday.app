@@ -183,7 +183,7 @@ describe("useDragAndDrop", () => {
     endDrag();
 
     expect(onActivityTap).toHaveBeenCalledOnce();
-    expect(onActivityTap).toHaveBeenCalledWith(1);
+    expect(onActivityTap).toHaveBeenCalledWith(1, 150);
     expect(wrapper.vm.activities[0].duration_minutes).toBe(100);
   });
 
@@ -199,7 +199,7 @@ describe("useDragAndDrop", () => {
     moveDrag(new MouseEvent("mousemove", { clientX: 80, clientY: 150 }));
     endDrag();
 
-    expect(onActivityTap).toHaveBeenCalledWith(1);
+    expect(onActivityTap).toHaveBeenCalledWith(1, 150);
     expect(
       wrapper.vm.activities.map((activity) => activity.start_time_minutes),
     ).toEqual([100, 200, 300]);
@@ -218,7 +218,7 @@ describe("useDragAndDrop", () => {
     startDrag(touchStart, mockElementA, 0, false);
     endDrag();
 
-    expect(onActivityTap).toHaveBeenCalledWith(1);
+    expect(onActivityTap).toHaveBeenCalledWith(1, 150);
     expect(wrapper.vm.activities[0].duration_minutes).toBe(100);
   });
 
@@ -257,7 +257,7 @@ describe("useDragAndDrop", () => {
     ]);
   });
 
-  it("does not treat a real surface drag as a tap", async () => {
+  it("uses a real surface drag to move only the shared boundary", async () => {
     await nextTick();
 
     startDrag(
@@ -270,10 +270,19 @@ describe("useDragAndDrop", () => {
     endDrag();
 
     expect(onActivityTap).not.toHaveBeenCalled();
-    expect(wrapper.vm.activities[0].duration_minutes).toBe(135);
+    expect(
+      wrapper.vm.activities.map((activity) => [
+        activity.start_time_minutes,
+        activity.duration_minutes,
+      ]),
+    ).toEqual([
+      [100, 135],
+      [235, 65],
+      [300, 100],
+    ]);
   });
 
-  it("should not change start time of activity A or end time of activity B when dragging the border", async () => {
+  it("should not change start time of activity A, end time of activity B, or later activities when dragging the border", async () => {
     await nextTick(); // Wait for onMounted to run
 
     const currentActivities = wrapper.vm.activities;
@@ -301,6 +310,10 @@ describe("useDragAndDrop", () => {
         wrapper.vm.activities[1].start_time_minutes +
           wrapper.vm.activities[1].duration_minutes,
       ).toBe(initialEndTimeB);
+      expect(wrapper.vm.activities[2]).toMatchObject({
+        start_time_minutes: 300,
+        duration_minutes: 100,
+      });
     }
   });
 
@@ -322,7 +335,14 @@ describe("useDragAndDrop", () => {
     endDrag();
 
     expect(wrapper.vm.activities[0].duration_minutes).toBe(65);
-    expect(wrapper.vm.activities[1].start_time_minutes).toBe(165);
+    expect(wrapper.vm.activities[1]).toMatchObject({
+      start_time_minutes: 165,
+      duration_minutes: 135,
+    });
+    expect(wrapper.vm.activities[2]).toMatchObject({
+      start_time_minutes: 300,
+      duration_minutes: 100,
+    });
   });
 
   it("snaps a dragged border to 15-minute boundaries over the time margin", async () => {
@@ -397,6 +417,35 @@ describe("useDragAndDrop", () => {
     ).toBe(100);
   });
 
+  it("resizes only the activity end when the following activity has a gap", async () => {
+    await nextTick();
+    const activityStore = useActivityStore();
+    activityStore.updateActivity(2, {
+      start_time_minutes: 250,
+      duration_minutes: 50,
+    });
+
+    startDrag(
+      new MouseEvent("mousedown", { clientY: 150 }),
+      mockElementA,
+      0,
+      false,
+    );
+    moveDrag(new MouseEvent("mousemove", { clientY: 185, clientX: 150 }));
+    endDrag();
+
+    expect(
+      wrapper.vm.activities.map((activity) => [
+        activity.start_time_minutes,
+        activity.duration_minutes,
+      ]),
+    ).toEqual([
+      [100, 135],
+      [250, 50],
+      [300, 100],
+    ]);
+  });
+
   it("should not snap when resizing and mouse is outside time markers area", async () => {
     await nextTick();
 
@@ -419,5 +468,13 @@ describe("useDragAndDrop", () => {
     const expectedDuration = initialDuration + (185 - 150); // Mouse moved 35 pixels
 
     expect(newDuration).toBe(expectedDuration);
+    expect(wrapper.vm.activities[1]).toMatchObject({
+      start_time_minutes: 235,
+      duration_minutes: 65,
+    });
+    expect(wrapper.vm.activities[2]).toMatchObject({
+      start_time_minutes: 300,
+      duration_minutes: 100,
+    });
   });
 });

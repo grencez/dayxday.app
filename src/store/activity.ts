@@ -128,26 +128,6 @@ export const useActivityStore = defineStore("dayxday-structured-tags-v1", {
           .sort(
             (left, right) => left.start_time_minutes - right.start_time_minutes,
           ),
-    findActivityAtTime:
-      (state) =>
-      (time: number, date: string): Activity | null =>
-        state.activities.find(
-          (activity) =>
-            activity.date === date &&
-            time >= activity.start_time_minutes &&
-            time < activity.start_time_minutes + activity.duration_minutes,
-        ) ?? null,
-    findActivitiesAfterTime:
-      (state) =>
-      (time: number, date: string): Activity[] =>
-        state.activities
-          .filter(
-            (activity) =>
-              activity.date === date && activity.start_time_minutes > time,
-          )
-          .sort(
-            (left, right) => left.start_time_minutes - right.start_time_minutes,
-          ),
     activeTagGroups(state): TagGroup[] {
       return state.tagGroups
         .map((group) => ({
@@ -509,51 +489,79 @@ export const useActivityStore = defineStore("dayxday-structured-tags-v1", {
         (activity) => activity.id !== id,
       );
     },
-    insertActivityAtTime(
-      time: number,
+    replaceActivityInterval(
+      start: number,
+      end: number,
       date: string,
-      newActivity: Pick<Activity, "tagIds">,
-      endLimitMinutes: number,
-    ) {
+      tagIds: string[],
+    ): boolean {
       if (
-        !Number.isFinite(time) ||
-        !Number.isFinite(endLimitMinutes) ||
-        time < 0 ||
-        time >= 1440 ||
-        endLimitMinutes <= time ||
-        !isValidSelection(newActivity.tagIds, this.tagGroups, false)
+        !Number.isFinite(start) ||
+        !Number.isFinite(end) ||
+        start < 0 ||
+        end > 1440 ||
+        end <= start ||
+        !isValidSelection(tagIds, this.tagGroups, false)
       )
-        return;
-      const existingActivity = this.findActivityAtTime(time, date);
-      const nextActivities = this.findActivitiesAfterTime(time, date);
-      const nextStart = nextActivities.length
-        ? nextActivities[0].start_time_minutes
-        : 1440;
-      const newEnd = Math.min(nextStart, endLimitMinutes, 1440);
-      if (newEnd <= time) return;
+        return false;
+
       this.invalidateCaptureUndo();
-      if (existingActivity) {
-        if (existingActivity.start_time_minutes === time) {
-          this.activities = this.activities.filter(
-            (activity) => activity.id !== existingActivity.id,
-          );
-        } else {
-          existingActivity.duration_minutes =
-            time - existingActivity.start_time_minutes;
+      const occupiedIds = new Set(
+        this.activities.map((activity) => activity.id),
+      );
+      let nextId = this.nextId;
+      const allocateId = () => {
+        while (occupiedIds.has(nextId)) nextId += 1;
+        const id = nextId;
+        occupiedIds.add(id);
+        nextId += 1;
+        return id;
+      };
+      const replacements: Activity[] = [];
+
+      for (const activity of this.activities) {
+        const activityStart = activity.start_time_minutes;
+        const activityEnd = activityStart + activity.duration_minutes;
+        const overlaps =
+          activity.date === date && activityStart < end && activityEnd > start;
+        if (!overlaps) {
+          replacements.push(activity);
+          continue;
+        }
+
+        const keepsLeft = activityStart < start;
+        const keepsRight = activityEnd > end;
+        if (keepsLeft) {
+          replacements.push({
+            ...activity,
+            duration_minutes: start - activityStart,
+          });
+        }
+        if (keepsRight) {
+          replacements.push({
+            ...activity,
+            id: keepsLeft ? allocateId() : activity.id,
+            start_time_minutes: end,
+            duration_minutes: activityEnd - end,
+          });
         }
       }
-      const id = findAvailableActivityId(this.activities, this.nextId);
-      this.activities.push({
-        id,
-        tagIds: canonicalTagIds(newActivity.tagIds, this.tagGroups),
-        start_time_minutes: time,
-        duration_minutes: newEnd - time,
+
+      replacements.push({
+        id: allocateId(),
+        tagIds: canonicalTagIds(tagIds, this.tagGroups),
+        start_time_minutes: start,
+        duration_minutes: end - start,
         date,
       });
-      this.nextId = id + 1;
-      this.activities.sort(
-        (left, right) => left.start_time_minutes - right.start_time_minutes,
+      this.activities = replacements.sort(
+        (left, right) =>
+          left.date.localeCompare(right.date) ||
+          left.start_time_minutes - right.start_time_minutes ||
+          left.id - right.id,
       );
+      this.nextId = nextId;
+      return true;
     },
   },
 });

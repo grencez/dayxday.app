@@ -104,16 +104,15 @@ describe("structured activity store", () => {
     expect(store.recentTagSelections).toEqual([["focus", "home"]]);
   });
 
-  it("inserts only nonempty known selections and preserves timeline timing behavior", () => {
+  it("rejects invalid replacement intervals and selections", () => {
     const store = configuredStore();
     store.initializeActivities([activity(1, ["office"], 0, 120)]);
-    store.insertActivityAtTime(60, day, { tagIds: [] }, 300);
-    expect(store.activities).toHaveLength(1);
-    store.insertActivityAtTime(60, day, { tagIds: ["focus"] }, 300);
-    expect(store.getActivitiesForDay(day)).toMatchObject([
-      { tagIds: ["office"], start_time_minutes: 0, duration_minutes: 60 },
-      { tagIds: ["focus"], start_time_minutes: 60, duration_minutes: 240 },
-    ]);
+
+    expect(store.replaceActivityInterval(60, 90, day, [])).toBe(false);
+    expect(store.replaceActivityInterval(90, 60, day, ["focus"])).toBe(false);
+    expect(store.replaceActivityInterval(-1, 60, day, ["focus"])).toBe(false);
+    expect(store.replaceActivityInterval(60, 1441, day, ["focus"])).toBe(false);
+    expect(store.activities).toEqual([activity(1, ["office"], 0, 120)]);
   });
 
   it("updates timing and replaces one day without changing another day", () => {
@@ -156,19 +155,16 @@ describe("structured activity store", () => {
     );
   });
 
-  it("finds day-scoped activities at boundaries and after a time", () => {
+  it("creates exact future intervals without a current-time cap", () => {
     const store = configuredStore();
-    store.initializeActivities([
-      activity(1, ["office"], 0, 60),
-      activity(2, ["focus"], 60, 60),
-      { ...activity(3, ["admin"], 0, 60), date: "2024-05-11" },
-    ]);
 
-    expect(store.findActivityAtTime(59.9, day)?.id).toBe(1);
-    expect(store.findActivityAtTime(60, day)?.id).toBe(2);
-    expect(store.findActivityAtTime(120, day)).toBeNull();
-    expect(store.findActivitiesAfterTime(30, day).map(({ id }) => id)).toEqual([
-      2,
+    expect(store.replaceActivityInterval(180, 300, day, ["focus"])).toBe(true);
+    expect(store.getActivitiesForDay(day)).toMatchObject([
+      {
+        tagIds: ["focus"],
+        start_time_minutes: 180,
+        duration_minutes: 120,
+      },
     ]);
   });
 
@@ -204,44 +200,41 @@ describe("structured activity store", () => {
     expect(store.nextId).toBe(4);
   });
 
-  it("preserves manual insertion timing inside and at the start of activities", () => {
+  it("splits both tails when replacing part of one activity", () => {
     const store = configuredStore();
-    store.initializeActivities([
-      activity(1, ["office"], 0, 120),
-      activity(2, ["admin"], 120, 60),
-    ]);
+    store.initializeActivities([activity(1, ["office"], 0, 120)]);
 
-    store.insertActivityAtTime(60, day, { tagIds: ["focus"] }, 1440);
-    expect(store.getActivitiesForDay(day)).toMatchObject([
-      { id: 1, start_time_minutes: 0, duration_minutes: 60 },
-      { tagIds: ["focus"], start_time_minutes: 60, duration_minutes: 60 },
-      { id: 2, start_time_minutes: 120, duration_minutes: 60 },
-    ]);
-
-    store.insertActivityAtTime(120, day, { tagIds: ["home"] }, 200);
-    expect(store.getActivitiesForDay(day)).toMatchObject([
-      { id: 1, start_time_minutes: 0, duration_minutes: 60 },
-      { tagIds: ["focus"], start_time_minutes: 60, duration_minutes: 60 },
-      { tagIds: ["home"], start_time_minutes: 120, duration_minutes: 80 },
-    ]);
-  });
-
-  it("inserts before schedules, honors the end limit, and rejects invalid ranges", () => {
-    const store = configuredStore();
-    store.initializeActivities([activity(9, ["admin"], 700, 300)]);
-
-    store.insertActivityAtTime(500, day, { tagIds: ["focus"] }, 540);
-    store.insertActivityAtTime(1440, day, { tagIds: ["focus"] }, 1440);
-    store.insertActivityAtTime(601, day, { tagIds: ["focus"] }, 600);
-    store.insertActivityAtTime(300, day, { tagIds: ["unknown"] }, 400);
+    expect(store.replaceActivityInterval(30, 90, day, ["focus"])).toBe(true);
 
     expect(store.getActivitiesForDay(day)).toMatchObject([
       {
-        tagIds: ["focus"],
-        start_time_minutes: 500,
-        duration_minutes: 40,
+        id: 1,
+        tagIds: ["office"],
+        start_time_minutes: 0,
+        duration_minutes: 30,
       },
-      { id: 9, start_time_minutes: 700, duration_minutes: 300 },
+      { tagIds: ["focus"], start_time_minutes: 30, duration_minutes: 60 },
+      { tagIds: ["office"], start_time_minutes: 90, duration_minutes: 30 },
     ]);
+    expect(new Set(store.activities.map(({ id }) => id)).size).toBe(3);
+  });
+
+  it("overwrites across activities while preserving outside fragments and days", () => {
+    const store = configuredStore();
+    const other = { ...activity(9, ["home"], 0, 120), date: "2024-05-11" };
+    store.initializeActivities([
+      activity(1, ["office"], 0, 60),
+      activity(2, ["admin"], 60, 60),
+      other,
+    ]);
+
+    expect(store.replaceActivityInterval(45, 90, day, ["focus"])).toBe(true);
+
+    expect(store.getActivitiesForDay(day)).toMatchObject([
+      { tagIds: ["office"], start_time_minutes: 0, duration_minutes: 45 },
+      { tagIds: ["focus"], start_time_minutes: 45, duration_minutes: 45 },
+      { tagIds: ["admin"], start_time_minutes: 90, duration_minutes: 30 },
+    ]);
+    expect(store.getActivitiesForDay("2024-05-11")).toEqual([other]);
   });
 });
