@@ -7,8 +7,10 @@
 src/node_modules/
 .vite/
 /package-lock.json
+/playwright.config.ts
 /test-results/
 /playwright-report/
+/blob-report/
 
 # Log files
 *.log

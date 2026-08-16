@@ -1,6 +1,22 @@
 import { expect, test } from "@playwright/test";
+import { preview, type PreviewServer } from "vite";
 
+const previewPort = Number(process.env.DAYXDAY_TEST_PORT ?? 4173);
+const previewUrl = `http://127.0.0.1:${previewPort}`;
 const storeKey = "dayxday-structured-tags-v1";
+let previewServer: PreviewServer | undefined;
+
+test.use({ baseURL: previewUrl });
+test.beforeAll(async () => {
+  previewServer = await preview({
+    preview: {
+      host: "127.0.0.1",
+      port: previewPort,
+      strictPort: true,
+    },
+  });
+});
+test.afterAll(async () => previewServer?.close());
 
 function stateForToday() {
   const today = new Date();

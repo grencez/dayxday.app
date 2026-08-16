@@ -5,13 +5,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "tidy": "prettier --write .",
-    "lint": "eslint .",
+    "tidy": "prettier . --write --log-level warn",
+    "lint": "eslint . --quiet",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:browse": "playwright test",
-    "test:preview": "playwright test -c playwright.preview.config.ts",
-    "tidytest": "npm run tidy && npm run lint && npm test && npm run test:preview"
+    "test": "vitest run --reporter=dot",
+    "test:browse": "npm run build && playwright test --reporter=dot --trace=retain-on-failure test/browse",
+    "tidytest": "npm run tidy && npm run lint && npm test && npm run test:browse"
   },
   "dependencies": {
     "idb": "^8.0.1",
