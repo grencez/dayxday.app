@@ -252,6 +252,85 @@ test("two-click creation handles exact times, gaps, dragging, and takeover", asy
   await context.close();
 });
 
+test("unfilled slots can be dragged, deleted, or assigned tags", async ({
+  page,
+}) => {
+  const state = stateForToday();
+  state.activities[0].duration_minutes = 30;
+  state.activities.push({
+    id: 3,
+    tagIds: ["focus"],
+    start_time_minutes: 240,
+    duration_minutes: 60,
+    date: state.activities[0].date,
+  });
+  state.nextId = 4;
+  await page.goto("/");
+  await page.evaluate(
+    ({ key, persisted }) =>
+      localStorage.setItem(key, JSON.stringify(persisted)),
+    { key: storeKey, persisted: state },
+  );
+  await page.reload();
+
+  await expect(page.locator(".activity-border")).toHaveCount(0);
+  const internalGap = page.locator(".timeline-gap").nth(1);
+  await internalGap.scrollIntoViewIfNeeded();
+  const box = await internalGap.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2 + 15);
+  await page.mouse.up();
+
+  await page.locator(".timeline-gap").nth(1).click();
+  let editor = page.getByRole("dialog", { name: "Fill unfilled time" });
+  await expect(editor).toContainText("01:30–02:15");
+  await editor.getByRole("button", { name: "Delete unfilled time" }).click();
+  await expect(page.locator('[data-activity-id="1"]')).toHaveCSS(
+    "height",
+    "30px",
+  );
+  await editor
+    .getByRole("button", { name: "Confirm delete unfilled time" })
+    .click();
+
+  await page.locator(".timeline-gap").nth(1).click();
+  editor = page.getByRole("dialog", { name: "Fill unfilled time" });
+  await expect(editor).toContainText("03:00–04:00");
+  const tagChoices = editor.locator(".tag-choices");
+  await tagChoices.getByRole("button", { name: "Focus", exact: true }).click();
+  await tagChoices
+    .getByRole("button", { name: "Meeting", exact: true })
+    .click();
+  await editor.getByRole("button", { name: "Save" }).click();
+
+  const readIntervals = () =>
+    page.evaluate((key) => {
+      const persisted = JSON.parse(localStorage.getItem(key)!);
+      return persisted.activities.map(
+        (activity: {
+          tagIds: string[];
+          start_time_minutes: number;
+          duration_minutes: number;
+        }) => [
+          activity.tagIds,
+          activity.start_time_minutes,
+          activity.duration_minutes,
+        ],
+      );
+    }, storeKey);
+  const expected = [
+    [["focus"], 60, 75],
+    [["meeting"], 135, 45],
+    [["meeting"], 180, 60],
+    [["focus"], 240, 60],
+  ];
+  await expect.poll(readIntervals).toEqual(expected);
+  await page.reload();
+  await expect.poll(readIntervals).toEqual(expected);
+});
+
 test("mobile deletion requires confirmation and persists after reload", async ({
   browser,
 }) => {
@@ -400,52 +479,6 @@ test("archived tags leave historical display but disappear from capture", async 
     page.getByRole("button", { name: "Focus", exact: true }),
   ).toHaveCount(0);
   await expect(page.locator(".tag-total-group")).toContainText("Focus");
-});
-
-test("dragging a shared border moves only that boundary", async ({ page }) => {
-  const state = stateForToday();
-  state.activities.push({
-    id: 3,
-    tagIds: ["focus"],
-    start_time_minutes: 180,
-    duration_minutes: 60,
-    date: state.activities[0].date,
-  });
-  state.nextId = 4;
-  await page.goto("/");
-  await page.evaluate(
-    ({ key, persisted }) =>
-      localStorage.setItem(key, JSON.stringify(persisted)),
-    { key: storeKey, persisted: state },
-  );
-  await page.reload();
-
-  const border = page.locator(".activity-border").first();
-  await border.scrollIntoViewIfNeeded();
-  const box = await border.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2 + 15);
-  await page.mouse.up();
-
-  await expect
-    .poll(() =>
-      page.evaluate((key) => {
-        const persisted = JSON.parse(localStorage.getItem(key)!);
-        return persisted.activities.map(
-          (activity: {
-            start_time_minutes: number;
-            duration_minutes: number;
-          }) => [activity.start_time_minutes, activity.duration_minutes],
-        );
-      }, storeKey),
-    )
-    .toEqual([
-      [60, 75],
-      [135, 45],
-      [180, 60],
-    ]);
 });
 
 test("dragging the broad activity surface moves the same local boundary", async ({

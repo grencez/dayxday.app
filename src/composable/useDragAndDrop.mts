@@ -18,14 +18,23 @@ function pointerPosition(event: MouseEvent | TouchEvent) {
 export function useDragAndDrop(
   date: Ref<string>,
   onActivityTap?: (activityId: number, clientY: number) => void,
+  onGapTap?: (
+    start: number,
+    end: number,
+    clientY: number,
+    trigger: HTMLElement,
+  ) => void,
 ) {
   const activityStore = useActivityStore();
   const isDragging = ref(false);
 
   let draggedItem: HTMLElement | null = null;
-  let startedFromActivitySurface = false;
   let draggedActivityId: number | null = null;
   let draggedBoundaryIndex: number | null = null;
+  let draggedGapStart: number | null = null;
+  let draggedGapEnd: number | null = null;
+  let draggedGapNextId: number | null = null;
+  let draggedGapNextIndex: number | null = null;
   let draggedDate: string | null = null;
 
   let initialStartTime = 0;
@@ -45,17 +54,9 @@ export function useDragAndDrop(
 
   // --- Event Handlers ---
 
-  /**
-   * Initiates the dragging process.
-   */
-  const startDrag = (
-    e: MouseEvent | TouchEvent,
-    item: Element,
-    index: number,
-    isBorder: boolean,
-  ) => {
+  function prepareDrag(e: MouseEvent | TouchEvent, item: Element) {
     const position = pointerPosition(e);
-    if (!position) return;
+    if (!position) return false;
     isDragging.value = true;
     if (e.cancelable) e.preventDefault();
     draggedItem = item as HTMLElement;
@@ -69,19 +70,50 @@ export function useDragAndDrop(
         start_time_minutes,
         duration_minutes,
       }));
+    return true;
+  }
 
-    startBoundaryDrag(item, index, !isBorder);
-  };
-
-  /**
-   * Activity surfaces and explicit separators manipulate the same trailing
-   * boundary. The surface remains the deliberately large drag target.
-   */
-  const startBoundaryDrag = (
+  /** Initiates a trailing-boundary drag from an activity surface. */
+  const startDrag = (
+    e: MouseEvent | TouchEvent,
     item: Element,
     index: number,
-    fromActivitySurface: boolean,
   ) => {
+    if (!prepareDrag(e, item)) return;
+    draggedGapStart = null;
+    draggedGapEnd = null;
+    startBoundaryDrag(item, index);
+  };
+
+  /** Initiates the same trailing-boundary gesture from an Unfilled surface. */
+  const startGapDrag = (
+    e: MouseEvent | TouchEvent,
+    item: Element,
+    start: number,
+    end: number,
+  ) => {
+    if (!prepareDrag(e, item)) return;
+    const activities = activityStore.getActivitiesForDay(draggedDate!);
+    const nextIndex = activities.findIndex(
+      (activity) => activity.start_time_minutes === end,
+    );
+    const nextActivity = activities[nextIndex];
+    draggedActivityId = null;
+    draggedBoundaryIndex = null;
+    draggedGapStart = start;
+    draggedGapEnd = end;
+    draggedGapNextId = nextActivity?.id ?? null;
+    draggedGapNextIndex = nextIndex >= 0 ? nextIndex : null;
+    initialNextEnd = nextActivity
+      ? nextActivity.start_time_minutes + nextActivity.duration_minutes
+      : end;
+    (item as HTMLElement).style.cursor = nextActivity ? "ns-resize" : "pointer";
+    const timeAxisArea = document.querySelector(".time-axis-area");
+    border_orig_screen_y = timeAxisArea?.getBoundingClientRect().top + end;
+  };
+
+  /** The deliberately broad activity surface manipulates its trailing boundary. */
+  const startBoundaryDrag = (item: Element, index: number) => {
     const activities = activityStore.getActivitiesForDay(draggedDate!);
     const activity = activities[index];
     if (!activity) return;
@@ -89,8 +121,7 @@ export function useDragAndDrop(
 
     draggedBoundaryIndex = index;
     draggedActivityId = activity.id;
-    startedFromActivitySurface = fromActivitySurface;
-    if (fromActivitySurface) (item as HTMLElement).style.cursor = "ns-resize";
+    (item as HTMLElement).style.cursor = "ns-resize";
     initialStartTime = activity.start_time_minutes;
     initialDurationA = activity.duration_minutes;
     initialNextStart = nextActivity?.start_time_minutes ?? 1440;
@@ -138,6 +169,8 @@ export function useDragAndDrop(
 
     if (draggedBoundaryIndex !== null) {
       handleBoundaryDrag(border_curr_screen_y, draggedBoundaryIndex);
+    } else if (draggedGapStart !== null && draggedGapEnd !== null) {
+      handleGapBoundaryDrag(border_curr_screen_y);
     }
   };
 
@@ -151,23 +184,40 @@ export function useDragAndDrop(
 
     if (draggedItem) {
       const tappedActivityId =
-        allowTap && startedFromActivitySurface && !exceededDragThreshold
-          ? draggedActivityId
+        allowTap && !exceededDragThreshold ? draggedActivityId : null;
+      const tappedGap =
+        allowTap &&
+        !exceededDragThreshold &&
+        draggedGapStart !== null &&
+        draggedGapEnd !== null
+          ? {
+              start: draggedGapStart,
+              end: draggedGapEnd,
+              trigger: draggedItem,
+            }
           : null;
       if (!allowTap && exceededDragThreshold) rollbackDrag();
 
-      draggedItem.style.cursor = startedFromActivitySurface
-        ? "move"
-        : "ns-resize";
+      draggedItem.style.cursor = draggedGapStart === null ? "move" : "pointer";
       draggedItem = null;
-      startedFromActivitySurface = false;
       draggedActivityId = null;
       draggedBoundaryIndex = null;
+      draggedGapStart = null;
+      draggedGapEnd = null;
+      draggedGapNextId = null;
+      draggedGapNextIndex = null;
       draggedDate = null;
       exceededDragThreshold = false;
       originalTimings = [];
       if (tappedActivityId !== null)
         onActivityTap?.(tappedActivityId, pointerOriginY);
+      else if (tappedGap)
+        onGapTap?.(
+          tappedGap.start,
+          tappedGap.end,
+          pointerOriginY,
+          tappedGap.trigger,
+        );
     }
   };
 
@@ -235,6 +285,28 @@ export function useDragAndDrop(
     });
   }
 
+  function handleGapBoundaryDrag(borderCurrentScreenY: number) {
+    if (
+      draggedGapStart === null ||
+      draggedGapEnd === null ||
+      draggedGapNextId === null ||
+      draggedGapNextIndex === null
+    )
+      return;
+    const diffY = borderCurrentScreenY - border_orig_screen_y;
+    const boundary = draggedGapEnd + diffY;
+    if (boundary < draggedGapStart || boundary >= initialNextEnd) return;
+    const nextDuration = initialNextEnd - boundary;
+    activityStore.updateActivity(draggedGapNextId, {
+      start_time_minutes: boundary,
+      duration_minutes: nextDuration,
+    });
+    updateActivityElementStyle(draggedGapNextIndex, {
+      top: boundary,
+      height: nextDuration,
+    });
+  }
+
   // --- Event Listeners ---
 
   onMounted(() => {
@@ -277,38 +349,31 @@ export function useDragAndDrop(
   });
 
   function handleMouseDown(e: MouseEvent) {
-    const target = e.target as HTMLElement;
-    const activities = activityStore.getActivitiesForDay(date.value);
-    if (target.classList.contains("activity-item")) {
-      const activityId = Number(target.dataset.activityId);
-      const index = activities.findIndex((a) => a.id === activityId);
-      if (index !== -1) {
-        startDrag(e, target, index, false);
-      }
-    } else if (target.classList.contains("activity-border")) {
-      const index = Number(target.dataset.borderIndex);
-      if (!isNaN(index)) {
-        startDrag(e, target, index, true);
-      }
-    }
+    handlePointerStart(e);
   }
 
   function handleTouchStart(e: TouchEvent) {
+    handlePointerStart(e);
+  }
+
+  function handlePointerStart(e: MouseEvent | TouchEvent) {
     const target = e.target as HTMLElement;
     const activities = activityStore.getActivitiesForDay(date.value);
-    if (target.classList.contains("activity-item")) {
-      const activityId = Number(target.dataset.activityId);
+    const activityElement = target.closest<HTMLElement>(".activity-item");
+    if (activityElement) {
+      const activityId = Number(activityElement.dataset.activityId);
       const index = activities.findIndex((a) => a.id === activityId);
-      if (index !== -1) {
-        startDrag(e, target, index, false);
-      }
-    } else if (target.classList.contains("activity-border")) {
-      const index = Array.from(
-        document.querySelectorAll(".activity-border"),
-      ).indexOf(target);
-      startDrag(e, target, index, true);
+      if (index !== -1) startDrag(e, activityElement, index);
+      return;
+    }
+    const gapElement = target.closest<HTMLElement>(".timeline-gap");
+    if (!gapElement) return;
+    const start = Number(gapElement.dataset.gapStart);
+    const end = Number(gapElement.dataset.gapEnd);
+    if (Number.isFinite(start) && Number.isFinite(end)) {
+      startGapDrag(e, gapElement, start, end);
     }
   }
 
-  return { startDrag, moveDrag, endDrag };
+  return { startDrag, startGapDrag, moveDrag, endDrag };
 }

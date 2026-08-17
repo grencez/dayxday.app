@@ -196,6 +196,68 @@ describe("ActivityTagEditor", () => {
     expect(wrapper.emitted("close")).toBeUndefined();
   });
 
+  it("turns an exact unfilled interval into a tagged activity", async () => {
+    const store = useActivityStore();
+    store.updateActivity(2, {
+      start_time_minutes: 180,
+      duration_minutes: 60,
+    });
+    const wrapper = mount(ActivityTagEditor, {
+      props: {
+        gap: { start: 120, end: 180, date: day },
+        initialTagIds: ["home", "focus"],
+      },
+    });
+
+    expect(wrapper.get("h2").text()).toBe("Fill unfilled time");
+    expect(wrapper.get(".activity-editor-help").text()).toContain(
+      "02:00–03:00",
+    );
+    expect(wrapper.find(".archived-tag-toggle").exists()).toBe(false);
+    await wrapper.get(".activity-editor-save").trigger("click");
+
+    expect(store.getActivitiesForDay(day)).toMatchObject([
+      { id: 1, start_time_minutes: 60, duration_minutes: 60 },
+      {
+        tagIds: ["home", "focus"],
+        start_time_minutes: 120,
+        duration_minutes: 60,
+      },
+      { id: 2, start_time_minutes: 180, duration_minutes: 60 },
+    ]);
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("confirms deleting unfilled time and extends the previous activity", async () => {
+    const store = useActivityStore();
+    store.updateActivity(2, {
+      start_time_minutes: 180,
+      duration_minutes: 60,
+    });
+    const wrapper = mount(ActivityTagEditor, {
+      props: {
+        gap: { start: 120, end: 180, date: day },
+        initialTagIds: [],
+      },
+    });
+
+    expect(wrapper.get(".activity-editor-delete-button").text()).toBe(
+      "Delete unfilled time",
+    );
+    await wrapper.get(".activity-editor-delete-button").trigger("click");
+    expect(store.getActivitiesForDay(day)[0].duration_minutes).toBe(60);
+    expect(
+      wrapper.get(".activity-editor-delete-confirmation").text(),
+    ).toContain("preceding Office · Legacy activity will fill it");
+    await wrapper.get(".activity-editor-confirm-delete").trigger("click");
+
+    expect(store.getActivitiesForDay(day)).toMatchObject([
+      { id: 1, start_time_minutes: 60, duration_minutes: 120 },
+      { id: 2, start_time_minutes: 180, duration_minutes: 60 },
+    ]);
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
   it("requires inline confirmation before deleting an activity", async () => {
     const store = useActivityStore();
     const wrapper = mountEditor();

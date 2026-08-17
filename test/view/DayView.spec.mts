@@ -65,6 +65,44 @@ describe("DayView", () => {
     expect(wrapper.get(".timeline-help").text()).toContain(
       "Tap the time margin to choose a boundary",
     );
+    expect(wrapper.findAll(".timeline-gap")[0].attributes("disabled")).toBe(
+      undefined,
+    );
+    expect(wrapper.find(".activity-border").exists()).toBe(false);
+  });
+
+  it("fills an unfilled slot by editing its tags", async () => {
+    const store = useActivityStore();
+    store.updateActivity(2, {
+      start_time_minutes: 180,
+      duration_minutes: 60,
+    });
+    const wrapper = mount(DayView, { attachTo: document.body });
+    const internalGap = wrapper
+      .findAll(".timeline-gap")
+      .find((gap) => gap.attributes("style")?.includes("top: 120px"))!;
+
+    await internalGap.trigger("click");
+    expect(wrapper.get('[role="dialog"]').text()).toContain(
+      "Fill unfilled time",
+    );
+    const editor = wrapper.get('[role="dialog"]');
+    const toggles = editor.findAll(".tag-toggle");
+    await toggles
+      .find((button) => button.text() === "Meeting")!
+      .trigger("click");
+    await toggles.find((button) => button.text() === "Focus")!.trigger("click");
+    await wrapper.get(".activity-editor-save").trigger("click");
+
+    expect(store.getActivitiesForDay(day)).toMatchObject([
+      { tagIds: ["focus"], start_time_minutes: 60, duration_minutes: 60 },
+      { tagIds: ["focus"], start_time_minutes: 120, duration_minutes: 60 },
+      { tagIds: ["meeting"], start_time_minutes: 180, duration_minutes: 60 },
+    ]);
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(wrapper.get("h1").element);
+    wrapper.unmount();
   });
 
   it("opens the editor only when no creation boundary is pending", async () => {
@@ -253,8 +291,11 @@ describe("DayView", () => {
     };
     const wrapper = mount(DayView);
     expect(wrapper.vm.currentDate).toBe("2024-05-10");
+    await wrapper.get(".timeline-gap").trigger("click");
+    expect(wrapper.vm.editingGap.date).toBe("2024-05-10");
     await vi.advanceTimersByTimeAsync(1000);
     expect(wrapper.vm.currentDate).toBe("2024-05-11");
+    expect(wrapper.vm.editingGap.date).toBe("2024-05-10");
     expect(store.runningActivity).toBeNull();
     expect(store.activities[0].tagIds).toEqual(["focus"]);
     wrapper.unmount();

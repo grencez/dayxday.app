@@ -13,7 +13,6 @@ describe("useDragAndDrop", () => {
   let selectedDate = ref(TEST_DATE);
   let mockElementA: HTMLElement;
   let mockElementB: HTMLElement;
-  let mockBorder: HTMLElement;
   let mockTimeMarkers: HTMLElement;
   let wrapper: VueWrapper;
   let onActivityTap: ReturnType<typeof vi.fn>;
@@ -21,7 +20,12 @@ describe("useDragAndDrop", () => {
     e: MouseEvent | TouchEvent,
     item: Element,
     index: number,
-    isBorder: boolean,
+  ) => void;
+  let startGapDrag: (
+    e: MouseEvent | TouchEvent,
+    item: Element,
+    start: number,
+    end: number,
   ) => void;
   let moveDrag: (e: MouseEvent | TouchEvent) => void;
   let endDrag: () => void;
@@ -94,17 +98,6 @@ describe("useDragAndDrop", () => {
         }) as DOMRect,
     );
 
-    mockBorder = document.createElement("div");
-    mockBorder.style.top = "200px";
-    mockBorder.addEventListener = vi.fn();
-    mockBorder.dispatchEvent = vi.fn();
-    mockBorder.getBoundingClientRect = vi.fn(
-      () =>
-        ({
-          top: 200,
-        }) as DOMRect,
-    );
-
     mockTimeMarkers = document.createElement("div");
     mockTimeMarkers.getBoundingClientRect = vi.fn(
       () =>
@@ -129,18 +122,6 @@ describe("useDragAndDrop", () => {
             }),
           },
         ] as unknown as NodeListOf<Element>;
-      } else if (selector === ".activity-border") {
-        return [
-          mockBorder,
-          {
-            style: { top: "" },
-            addEventListener: vi.fn(),
-            dispatchEvent: vi.fn(),
-            getBoundingClientRect: () => ({
-              top: 300,
-            }),
-          },
-        ] as unknown as NodeListOf<Element>;
       }
       return [] as unknown as NodeListOf<Element>;
     });
@@ -156,6 +137,7 @@ describe("useDragAndDrop", () => {
         const activityStore = useActivityStore();
         const dragAndDrop = useDragAndDrop(selectedDate, onActivityTap);
         startDrag = dragAndDrop.startDrag;
+        startGapDrag = dragAndDrop.startGapDrag;
         moveDrag = dragAndDrop.moveDrag;
         endDrag = dragAndDrop.endDrag;
         return {
@@ -177,7 +159,6 @@ describe("useDragAndDrop", () => {
       new MouseEvent("mousedown", { clientX: 20, clientY: 150 }),
       mockElementA,
       0,
-      false,
     );
     moveDrag(new MouseEvent("mousemove", { clientX: 23, clientY: 154 }));
     endDrag();
@@ -194,7 +175,6 @@ describe("useDragAndDrop", () => {
       new MouseEvent("mousedown", { clientX: 20, clientY: 150 }),
       mockElementA,
       0,
-      false,
     );
     moveDrag(new MouseEvent("mousemove", { clientX: 80, clientY: 150 }));
     endDrag();
@@ -215,7 +195,7 @@ describe("useDragAndDrop", () => {
       value: [{ clientX: 20, clientY: 150 }],
     });
 
-    startDrag(touchStart, mockElementA, 0, false);
+    startDrag(touchStart, mockElementA, 0);
     endDrag();
 
     expect(onActivityTap).toHaveBeenCalledWith(1, 150);
@@ -239,7 +219,7 @@ describe("useDragAndDrop", () => {
       value: [{ clientX: 150, clientY: 180 }],
     });
 
-    startDrag(touchStart, mockElementA, 0, false);
+    startDrag(touchStart, mockElementA, 0);
     moveDrag(touchMove);
     expect(wrapper.vm.activities[0].duration_minutes).not.toBe(100);
     window.dispatchEvent(new Event("touchcancel"));
@@ -264,7 +244,6 @@ describe("useDragAndDrop", () => {
       new MouseEvent("mousedown", { clientX: 20, clientY: 150 }),
       mockElementA,
       0,
-      false,
     );
     moveDrag(new MouseEvent("mousemove", { clientX: 150, clientY: 185 }));
     endDrag();
@@ -282,50 +261,10 @@ describe("useDragAndDrop", () => {
     ]);
   });
 
-  it("should not change start time of activity A, end time of activity B, or later activities when dragging the border", async () => {
-    await nextTick(); // Wait for onMounted to run
-
-    const currentActivities = wrapper.vm.activities;
-    expect(currentActivities).not.toBeNull();
-    if (currentActivities) {
-      const initialStartTimeA = currentActivities[0].start_time_minutes;
-      const initialEndTimeB =
-        currentActivities[1].start_time_minutes +
-        currentActivities[1].duration_minutes;
-
-      // Simulate mousedown on the border between A and B
-      const mousedownEvent = new MouseEvent("mousedown", { clientY: 150 });
-      startDrag(mousedownEvent, mockBorder, 0, true);
-
-      // Simulate mousemove to resize the border
-      const mousemoveEvent = new MouseEvent("mousemove", { clientY: 200 });
-      moveDrag(mousemoveEvent);
-      endDrag();
-
-      // Assert that start time of A and end time of B have not changed
-      expect(wrapper.vm.activities[0].start_time_minutes).toBe(
-        initialStartTimeA,
-      );
-      expect(
-        wrapper.vm.activities[1].start_time_minutes +
-          wrapper.vm.activities[1].duration_minutes,
-      ).toBe(initialEndTimeB);
-      expect(wrapper.vm.activities[2]).toMatchObject({
-        start_time_minutes: 300,
-        duration_minutes: 100,
-      });
-    }
-  });
-
   it("snaps to the nearest 15-minute boundary while resizing over the time margin", async () => {
     await nextTick();
 
-    startDrag(
-      new MouseEvent("mousedown", { clientY: 150 }),
-      mockElementA,
-      0,
-      false,
-    );
+    startDrag(new MouseEvent("mousedown", { clientY: 150 }), mockElementA, 0);
     moveDrag(
       new MouseEvent("mousemove", {
         clientY: 172,
@@ -345,42 +284,13 @@ describe("useDragAndDrop", () => {
     });
   });
 
-  it("snaps a dragged border to 15-minute boundaries over the time margin", async () => {
-    await nextTick();
-
-    startDrag(
-      new MouseEvent("mousedown", { clientY: 150 }),
-      mockBorder,
-      0,
-      true,
-    );
-    moveDrag(
-      new MouseEvent("mousemove", {
-        clientY: 172,
-        clientX: 50,
-      }),
-    );
-    endDrag();
-
-    expect(wrapper.vm.activities[0].duration_minutes).toBe(65);
-    expect(wrapper.vm.activities[1]).toMatchObject({
-      start_time_minutes: 165,
-      duration_minutes: 135,
-    });
-  });
-
   it("uses the currently selected date when a drag starts", async () => {
     await nextTick();
     const activityStore = useActivityStore();
     selectedDate.value = SECOND_DATE;
     await nextTick();
 
-    startDrag(
-      new MouseEvent("mousedown", { clientY: 150 }),
-      mockElementA,
-      0,
-      false,
-    );
+    startDrag(new MouseEvent("mousedown", { clientY: 150 }), mockElementA, 0);
     moveDrag(new MouseEvent("mousemove", { clientY: 185, clientX: 150 }));
     endDrag();
 
@@ -392,16 +302,11 @@ describe("useDragAndDrop", () => {
     ).toBe(135);
   });
 
-  it("keeps a border drag bound to the date where the gesture started", async () => {
+  it("keeps a surface drag bound to the date where the gesture started", async () => {
     await nextTick();
     const activityStore = useActivityStore();
 
-    startDrag(
-      new MouseEvent("mousedown", { clientY: 150 }),
-      mockBorder,
-      0,
-      true,
-    );
+    startDrag(new MouseEvent("mousedown", { clientY: 150 }), mockElementA, 0);
     selectedDate.value = SECOND_DATE;
     await nextTick();
 
@@ -417,6 +322,31 @@ describe("useDragAndDrop", () => {
     ).toBe(100);
   });
 
+  it("drags an unfilled end by moving the following activity start", async () => {
+    await nextTick();
+    const activityStore = useActivityStore();
+    activityStore.updateActivity(2, {
+      start_time_minutes: 250,
+      duration_minutes: 50,
+    });
+    const gapElement = document.createElement("button");
+
+    startGapDrag(
+      new MouseEvent("mousedown", { clientY: 225 }),
+      gapElement,
+      200,
+      250,
+    );
+    moveDrag(new MouseEvent("mousemove", { clientY: 240, clientX: 150 }));
+    endDrag();
+
+    expect(wrapper.vm.activities).toMatchObject([
+      { id: 1, start_time_minutes: 100, duration_minutes: 100 },
+      { id: 2, start_time_minutes: 265, duration_minutes: 35 },
+      { id: 3, start_time_minutes: 300, duration_minutes: 100 },
+    ]);
+  });
+
   it("resizes only the activity end when the following activity has a gap", async () => {
     await nextTick();
     const activityStore = useActivityStore();
@@ -425,12 +355,7 @@ describe("useDragAndDrop", () => {
       duration_minutes: 50,
     });
 
-    startDrag(
-      new MouseEvent("mousedown", { clientY: 150 }),
-      mockElementA,
-      0,
-      false,
-    );
+    startDrag(new MouseEvent("mousedown", { clientY: 150 }), mockElementA, 0);
     moveDrag(new MouseEvent("mousemove", { clientY: 185, clientX: 150 }));
     endDrag();
 
@@ -453,7 +378,7 @@ describe("useDragAndDrop", () => {
 
     // Simulate mousedown on the first activity to start resizing
     const mousedownEvent = new MouseEvent("mousedown", { clientY: 150 });
-    startDrag(mousedownEvent, mockElementA, 0, false);
+    startDrag(mousedownEvent, mockElementA, 0);
 
     // Simulate mousemove to a position outside the time markers area
     const mousemoveEvent = new MouseEvent("mousemove", {

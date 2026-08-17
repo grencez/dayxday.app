@@ -18,8 +18,8 @@
         </button>
       </template>
       <template v-else>
-        Tap the time margin to choose a boundary. Tap an activity to edit its
-        tags; drag anywhere on it to move its trailing boundary.
+        Tap the time margin to choose a boundary. Tap filled or unfilled time to
+        edit its tags; drag an activity to move its trailing boundary.
       </template>
     </p>
     <div
@@ -52,39 +52,33 @@
         type="button"
         class="timeline-gap"
         :class="{ selectable: pendingBoundaryMinute !== null }"
+        :data-gap-start="gap.start"
+        :data-gap-end="gap.end"
         :style="{
           top: gap.start + 'px',
           height: gap.end - gap.start + 'px',
         }"
-        :disabled="pendingBoundaryMinute === null"
+        :title="
+          pendingBoundaryMinute === null
+            ? 'Tap to set tags; drag to adjust the end of this unfilled time'
+            : 'Use this side of the pending boundary'
+        "
         @click="handleSlotClick(gap.start, gap.end, $event)"
       >
         <span v-if="gap.end - gap.start >= 30">Unfilled</span>
       </button>
-      <template v-for="(activity, index) in activities" :key="activity.id">
-        <ActivityItem
-          :activity="activity"
-          :title="activityStore.titleForSelection(activity.tagIds)"
-          class="activity-item"
-          :style="{
-            top: activity.start_time_minutes + 'px',
-            height: activity.duration_minutes + 'px',
-          }"
-          @edit="handleActivityTap"
-        />
-        <div
-          v-if="index < activities.length - 1"
-          class="activity-border"
-          :data-border-index="index"
-          :style="{
-            top:
-              activity.start_time_minutes +
-              activity.duration_minutes -
-              5 +
-              'px',
-          }"
-        ></div>
-      </template>
+      <ActivityItem
+        v-for="activity in activities"
+        :key="activity.id"
+        :activity="activity"
+        :title="activityStore.titleForSelection(activity.tagIds)"
+        class="activity-item"
+        :style="{
+          top: activity.start_time_minutes + 'px',
+          height: activity.duration_minutes + 'px',
+        }"
+        @edit="handleActivityTap"
+      />
       <div
         v-if="pendingBoundaryMinute !== null"
         class="creation-boundary"
@@ -93,9 +87,16 @@
     </div>
     <ActivityTagEditor
       v-if="editingActivity"
-      :key="editingActivity.id"
+      :key="`activity-${editingActivity.id}`"
       :activity="editingActivity"
-      @close="closeActivityEditor"
+      @close="closeTimelineEditor"
+    />
+    <ActivityTagEditor
+      v-else-if="editingGap"
+      :key="`gap-${editingGap.date}-${editingGap.start}-${editingGap.end}`"
+      :gap="editingGap"
+      :initial-tag-ids="selectedTagIds"
+      @close="closeTimelineEditor"
     />
   </div>
 </template>
@@ -157,6 +158,11 @@ export default {
     });
     const pendingBoundaryMinute = ref<number | null>(null);
     const editingActivityId = ref<number | null>(null);
+    const editingGap = ref<{
+      start: number;
+      end: number;
+      date: string;
+    } | null>(null);
     const dayHeadingRef = ref<HTMLElement | null>(null);
     const timeAxisAreaRef = ref<HTMLElement | null>(null);
     let editorTrigger: HTMLElement | null = null;
@@ -213,14 +219,43 @@ export default {
       }
     }
 
+    function handleGapTap(
+      slotStart: number,
+      slotEnd: number,
+      clientY?: number,
+      trigger?: HTMLElement,
+    ) {
+      if (pendingBoundaryMinute.value === null) {
+        editorTrigger = trigger ?? null;
+        editingGap.value = {
+          start: slotStart,
+          end: slotEnd,
+          date: currentDate.value,
+        };
+        return;
+      }
+      const clickedMinute =
+        clientY === undefined
+          ? pendingBoundaryMinute.value === slotEnd
+            ? slotEnd - 1
+            : pendingBoundaryMinute.value + 1
+          : clientYToMinute(clientY, false);
+      if (clickedMinute !== null)
+        completeFromSlot(slotStart, slotEnd, clickedMinute);
+    }
+
     function handleSlotClick(
       slotStart: number,
       slotEnd: number,
       event: MouseEvent,
     ) {
-      const clickedMinute = clientYToMinute(event.clientY, false);
-      if (clickedMinute !== null)
-        completeFromSlot(slotStart, slotEnd, clickedMinute);
+      if (event.detail !== 0) return;
+      handleGapTap(
+        slotStart,
+        slotEnd,
+        undefined,
+        event.currentTarget as HTMLElement,
+      );
     }
 
     function cancelCreation() {
@@ -242,6 +277,7 @@ export default {
       editorTrigger = document.querySelector(
         `[data-activity-id="${activityId}"]`,
       );
+      editingGap.value = null;
       editingActivityId.value = activityId;
     }
 
@@ -265,15 +301,16 @@ export default {
       if (clickedMinute !== null) completeFromSlot(start, end, clickedMinute);
     }
 
-    async function closeActivityEditor() {
+    async function closeTimelineEditor() {
       editingActivityId.value = null;
+      editingGap.value = null;
       await nextTick();
       if (editorTrigger?.isConnected) editorTrigger.focus();
       else dayHeadingRef.value?.focus();
       editorTrigger = null;
     }
 
-    useDragAndDrop(currentDate, handleActivityTap);
+    useDragAndDrop(currentDate, handleActivityTap, handleGapTap);
 
     const editingActivity = computed(
       () =>
@@ -320,6 +357,7 @@ export default {
       currentDate,
       todayReceipt,
       editingActivity,
+      editingGap,
       dayHeadingRef,
       selectedTagIds,
       canInsertActivity,
@@ -329,7 +367,7 @@ export default {
       handleActivityTap,
       cancelCreation,
       formatMinute,
-      closeActivityEditor,
+      closeTimelineEditor,
     };
   },
 };
@@ -408,12 +446,14 @@ export default {
   background: var(--color-surface-muted);
   text-align: left;
   overflow: hidden;
+  user-select: none;
+  touch-action: none;
 }
-.timeline-gap:disabled {
-  opacity: 1;
+.timeline-gap {
+  cursor: pointer;
 }
 .timeline-gap.selectable {
-  cursor: pointer;
+  z-index: 2;
 }
 .timeline-gap.selectable:hover {
   border-color: var(--color-current);
@@ -426,15 +466,5 @@ export default {
   height: 3px;
   background: var(--color-current);
   pointer-events: none;
-}
-.activity-border {
-  position: absolute;
-  z-index: 1;
-  left: 0;
-  right: 0;
-  height: 10px;
-  cursor: ns-resize;
-  background-color: var(--color-drag-target);
-  touch-action: none;
 }
 </style>

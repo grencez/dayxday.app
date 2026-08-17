@@ -10,19 +10,32 @@
       tabindex="-1"
     >
       <div class="activity-editor-header">
-        <h2 id="activity-editor-title">Edit activity tags</h2>
+        <h2 id="activity-editor-title">
+          {{ activity ? "Edit activity tags" : "Fill unfilled time" }}
+        </h2>
         <button
           ref="closeButtonRef"
           type="button"
           class="activity-editor-close"
-          aria-label="Close activity tag editor"
+          :aria-label="
+            activity
+              ? 'Close activity tag editor'
+              : 'Close unfilled time editor'
+          "
           @click="closeEditor"
         >
           ×
         </button>
       </div>
       <p id="activity-editor-help" class="activity-editor-help">
-        Choose one or more tags. Groups are optional.
+        <template v-if="gap">
+          Set tags for {{ formatMinute(gap.start) }}–{{
+            formatMinute(gap.end)
+          }}.
+        </template>
+        <template v-else
+          >Choose one or more tags. Groups are optional.</template
+        >
       </p>
 
       <TagPicker
@@ -31,7 +44,7 @@
         :recent-tag-selections="activityStore.recentTagSelections"
         :title-for-selection="activityStore.titleForSelection"
         recent-class="editor-recent"
-        show-archived
+        :show-archived="activity !== undefined"
         @update:selected-tag-ids="updateSelectedTags"
         @select-recent="useRecent"
       />
@@ -39,7 +52,10 @@
       <p v-if="!selectionIsValid" class="activity-editor-error" role="status">
         Select at least one valid tag to save.
       </p>
-      <div class="activity-editor-delete">
+      <div
+        v-if="activity || (gap && previousActivity)"
+        class="activity-editor-delete"
+      >
         <button
           v-if="!confirmingDelete"
           ref="deleteButtonRef"
@@ -47,24 +63,37 @@
           class="activity-editor-delete-button"
           @click="requestDelete"
         >
-          Delete activity
+          {{ activity ? "Delete activity" : "Delete unfilled time" }}
         </button>
         <div
           v-else
           class="activity-editor-delete-confirmation"
           role="group"
-          aria-label="Confirm activity deletion"
+          :aria-label="
+            activity
+              ? 'Confirm activity deletion'
+              : 'Confirm unfilled time deletion'
+          "
         >
-          <p>Delete this activity? This cannot be undone.</p>
+          <p v-if="activity">Delete this activity? This cannot be undone.</p>
+          <p v-else-if="previousActivity">
+            Delete this unfilled time? The preceding
+            {{ activityStore.titleForSelection(previousActivity.tagIds) }}
+            activity will fill it.
+          </p>
           <div>
             <button type="button" @click="cancelDelete">Cancel deletion</button>
             <button
               ref="confirmDeleteRef"
               type="button"
               class="activity-editor-confirm-delete"
-              @click="deleteActivity"
+              @click="deleteTimelineItem"
             >
-              Confirm delete activity
+              {{
+                activity
+                  ? "Confirm delete activity"
+                  : "Confirm delete unfilled time"
+              }}
             </button>
           </div>
         </div>
@@ -90,10 +119,22 @@ import { isValidSelection } from "../function/tagSelection";
 import { type Activity, useActivityStore } from "../store/activity";
 import TagPicker from "./TagPicker.vue";
 
-const props = defineProps<{ activity: Activity }>();
+interface TimelineGap {
+  start: number;
+  end: number;
+  date: string;
+}
+
+const props = defineProps<{
+  activity?: Activity;
+  gap?: TimelineGap;
+  initialTagIds?: string[];
+}>();
 const emit = defineEmits<{ close: [] }>();
 const activityStore = useActivityStore();
-const selectedTagIds = ref([...props.activity.tagIds]);
+const selectedTagIds = ref([
+  ...(props.activity?.tagIds ?? props.initialTagIds ?? []),
+]);
 const dialogRef = ref<HTMLElement | null>(null);
 const closeButtonRef = ref<HTMLButtonElement | null>(null);
 const deleteButtonRef = ref<HTMLButtonElement | null>(null);
@@ -101,7 +142,23 @@ const confirmDeleteRef = ref<HTMLButtonElement | null>(null);
 const confirmingDelete = ref(false);
 
 const selectionIsValid = computed(() =>
-  isValidSelection(selectedTagIds.value, activityStore.tagGroups, false),
+  isValidSelection(
+    selectedTagIds.value,
+    activityStore.tagGroups,
+    props.activity === undefined,
+  ),
+);
+const dayActivities = computed(() =>
+  props.gap ? activityStore.getActivitiesForDay(props.gap.date) : [],
+);
+const previousActivity = computed(() =>
+  props.gap
+    ? dayActivities.value.find(
+        (candidate) =>
+          candidate.start_time_minutes + candidate.duration_minutes ===
+          props.gap!.start,
+      )
+    : undefined,
 );
 
 function closeEditor() {
@@ -110,9 +167,21 @@ function closeEditor() {
 
 function save() {
   if (!selectionIsValid.value) return;
-  activityStore.updateActivity(props.activity.id, {
-    tagIds: selectedTagIds.value,
-  });
+  if (props.activity) {
+    activityStore.updateActivity(props.activity.id, {
+      tagIds: selectedTagIds.value,
+    });
+  } else if (
+    !props.gap ||
+    !activityStore.replaceActivityInterval(
+      props.gap.start,
+      props.gap.end,
+      props.gap.date,
+      selectedTagIds.value,
+    )
+  ) {
+    return;
+  }
   closeEditor();
 }
 
@@ -128,9 +197,26 @@ async function cancelDelete() {
   deleteButtonRef.value?.focus();
 }
 
-function deleteActivity() {
-  activityStore.removeActivity(props.activity.id);
+function deleteTimelineItem() {
+  if (props.activity) {
+    activityStore.removeActivity(props.activity.id);
+  } else if (props.gap && previousActivity.value) {
+    activityStore.updateActivity(previousActivity.value.id, {
+      duration_minutes:
+        previousActivity.value.duration_minutes +
+        props.gap.end -
+        props.gap.start,
+    });
+  } else {
+    return;
+  }
   closeEditor();
+}
+
+function formatMinute(minute: number) {
+  const hours = Math.floor(minute / 60);
+  const minutes = minute % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 async function updateSelectedTags(tagIds: string[]) {
@@ -142,8 +228,8 @@ async function updateSelectedTags(tagIds: string[]) {
 }
 
 function useRecent(tagIds: string[]) {
-  activityStore.updateActivity(props.activity.id, { tagIds });
-  closeEditor();
+  selectedTagIds.value = tagIds;
+  save();
 }
 
 function handleKeydown(event: KeyboardEvent) {

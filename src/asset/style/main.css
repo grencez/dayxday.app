@@ -9,7 +9,6 @@
   --color-border-subtle: #eeeeee;
   --color-muted: #666666;
   --color-axis: #000000;
-  --color-drag-target: rgba(0, 0, 0, 0.1);
   --color-current: #174d25;
   --color-current-background: #dff4e4;
   --color-warning: #664d03;
@@ -30,7 +29,6 @@
     --color-border-subtle: #353535;
     --color-muted: #b8b8b8;
     --color-axis: #e5e5e5;
-    --color-drag-target: rgba(255, 255, 255, 0.14);
     --color-current: #b7efc4;
     --color-current-background: #193922;
     --color-warning: #ffe5a3;
